@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* --- STYLE DU CHATBOT NORA --- */
+
+/* Conteneur principal du Markdown */
+.markdown-container {
+  color: inherit;
+  line-height: 1.6;
+}
+
+/* Forcer l'affichage des points de liste */
+.markdown-container ul {
+  list-style-type: disc !important; /* Utilise des points */
+  margin-left: 1.5rem !important;  /* Décale vers la droite */
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  display: block !important;       /* Assure que ça ne reste pas en ligne */
+}
+
+.markdown-container li {
+  margin-bottom: 0.25rem;
+  display: list-item !important;   /* Force le comportement de liste */
+}
+
+/* Style pour les mots en gras */
+.markdown-container strong {
+  font-weight: 700;
+  color: #004751; /* Ta couleur thème */
+}
+
+/* Espacement entre les paragraphes */
+.markdown-container p {
+  margin-bottom: 0.75rem;
+}
+
+/* Optionnel : style pour les titres si Nora en utilise */
+.markdown-container h3 {
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: #004751;
+}

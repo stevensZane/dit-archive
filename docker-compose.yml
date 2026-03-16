@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: global_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: stevenszane
+      POSTGRES_PASSWORD: nethania22
+      POSTGRES_DB: default_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer
+    container_name: global_adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
