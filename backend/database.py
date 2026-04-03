@@ -51,55 +51,49 @@ class Project(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     description = Column(Text)
-    status = Column(String, default="pending") # pending | archived | rejected
+    status = Column(String, default="pending") 
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # --- Nouvelles colonnes pour Nora & l'Archiveur ---
-    upload_method = Column(String) # "github" ou "zip"
+    # --- GitHub & Metadata (Le nouveau cœur) ---
+    upload_method = Column(String, default="github") # On privilégie github
     github_repository_url = Column(String, nullable=True)
-    level = Column(String) # Le niveau au MOMENT du projet (L1, L2...)
-    primary_language = Column(String, nullable=True) # Python, JS, etc.
-    readme_content = Column(Text, nullable=True) # Extrait par ton script pour Nora
-    ai_summary = Column(Text, nullable=True) # Résumé généré par l'IA
     report_pdf_url = Column(String, nullable=True)
-    # --------------------------------------------------
-
-    program_id = Column(Integer, ForeignKey("programs.id"))
-    academic_year_id = Column(Integer, ForeignKey("academic_years.id"))
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
-    # -------------------------------------------------------------
-    author_name = Column(String, nullable=True) # Pour "Jean Dupont"
+    readme_content = Column(Text, nullable=True) # Stocké pour les recherches de Nora
+    primary_language = Column(String, nullable=True) # Récupéré via API GitHub
+    technologies_list = Column(String, nullable=True)
+    ai_summary = Column(Text, nullable=True) # Le résumé généré par Nora
     is_historical = Column(Boolean, default=False)
+    rejection_reason = Column(Text, nullable=True)
     
-    rejection_reason = Column(String, nullable=True)
-
-    program = relationship("Program", back_populates="projects")
+    # --- Organisation ---
+    level = Column(String) # L1, L2, L3, M1, M2
+    academic_year_id = Column(Integer, ForeignKey("academic_years.id"))
+    program_id = Column(Integer, ForeignKey("programs.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    author_name = Column(String, nullable=True) # Pour les archives historiques sans User lié
+    
+    # --- Relations ---
     academic_year = relationship("AcademicYear", back_populates="projects")
+    program = relationship("Program", back_populates="projects")
     owner = relationship("User", back_populates="projects")
+    # On garde les fichiers pour stocker uniquement les rapports PDF
     files = relationship("ProjectFile", back_populates="project", cascade="all, delete-orphan")
     technologies = relationship("Technology", secondary=project_technologies, back_populates="projects")
     comments = relationship("Comment", back_populates="project", cascade="all, delete-orphan")
     likes = relationship("Like", back_populates="project", cascade="all, delete-orphan")
-
+    
 class ProjectFile(Base):
     __tablename__ = "project_files"
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"))
-    file_name = Column(String, nullable=False)
-    github_path = Column(String, nullable=False) # Chemin final dans ton repo d'archive
     
-    # --- Colonnes de monitoring ---
-    file_size = Column(Float, nullable=True) # Taille en Mo
-    is_cleaned = Column(Boolean, default=False) # Confirmation du nettoyage
-    
+    file_name = Column(String, nullable=False) # Ex: "Rapport_Final.pdf"
+    github_path = Column(String, nullable=False)  # Lien Cloudinary, S3, ou ton stockage local
+    file_type = Column(String) # "report" | "presentation" | "other"
+    file_size = Column(Float, nullable=True) 
+    is_cleaned = Column(Boolean, default=False)
+
     project = relationship("Project", back_populates="files")
-    
-    # Nouvelle colonne pour le lien direct vers le document principal
-    report_pdf_url = Column(String, nullable=True) 
-    
-    # On peut aussi ajouter un booléen pour le filtrage rapide
-    has_report = Column(Boolean, default=False)
 
 class Technology(Base):
     __tablename__ = "technologies"

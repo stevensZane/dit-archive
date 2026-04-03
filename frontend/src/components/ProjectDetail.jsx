@@ -37,6 +37,19 @@ const ProjectDetail = () => {
     fetchProject();
   }, [id]);
 
+  const handleOpenReport = async () => {
+  try {
+    const res = await api.get(`/projects/${project.id}/report`, {
+      responseType: "blob",
+    });
+
+    const fileURL = window.URL.createObjectURL(new Blob([res.data]));
+    window.open(fileURL);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
   const backPath = location.state?.from || "/explore";
 
   // Gestion de l'affichage de l'auteur (Actif vs Historique)
@@ -93,35 +106,39 @@ const ProjectDetail = () => {
               </div>
 
               {/* Technologies utilisées */}
-              <div className="mt-10 pt-8 border-t border-slate-50">
-                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Code size={16} /> Stack Technique
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {project.technologies?.map((t) => (
-                    <span key={t.id} className="bg-slate-50 text-black-600 border border-slate-100 px-4 py-1.5 rounded-xl text-sm font-medium">
-                      {t.name}
-                    </span>
-                  ))}
-                  {project.primary_language && (
-                    <span className="bg-dit-pink text-black px-4 py-1.5 rounded-xl text-sm font-bold">
-                      {project.primary_language}
-                    </span>
-                  )}
-                </div>
+            <div className="mt-10 pt-8 border-t border-slate-50">
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Code size={16} /> Stack Technique
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {/* 1. On affiche le langage principal en premier avec un style distinct */}
+                {project.primary_language && (
+                  <span className="bg-dit-pink text-black px-4 py-1.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm shadow-dit-pink/20">
+                    <span className="w-2 h-2 bg-black rounded-full animate-pulse"></span>
+                    {project.primary_language}
+                  </span>
+                )}
+
+                {/* 2. On affiche les autres langages détectés par le worker (technologies_list) */}
+                {project.technologies_list && 
+                  project.technologies_list.split(", ")
+                    .filter(lang => lang !== project.primary_language) // On évite les doublons avec le primary
+                    .map((lang, index) => (
+                      <span key={`lang-${index}`} className="bg-slate-800 text-slate-100 px-4 py-1.5 rounded-xl text-sm font-medium">
+                        {lang}
+                      </span>
+                  ))
+                }
+
+                {/* 3. On affiche les tags manuels ajoutés lors de l'upload (technologies) */}
+                {project.technologies?.map((t) => (
+                  <span key={t.id} className="bg-slate-50 text-slate-600 border border-slate-100 px-4 py-1.5 rounded-xl text-sm font-medium">
+                    {t.name}
+                  </span>
+                ))}
               </div>
             </div>
-
-            {/* BOX NORA : RÉSUMÉ IA */}
-            {/* <div className="bg-gradient-to-br from-dit-teal to-[#005F6B] rounded-3xl p-8 md:p-10 text-white shadow-lg relative overflow-hidden">
-                <Sparkles className="absolute top-4 right-4 opacity-20" size={80} />
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    L'analyse de Nora
-                </h3>
-                <p className="text-teal-50 leading-relaxed italic">
-                    "{project.ai_summary || "Je suis en train d'analyser le contenu de ce projet pour vous en proposer un résumé pertinent. Revenez dans quelques instants !"}"
-                </p>
-            </div> */}
+            </div>
             <NoraSummary summary={noraText} isLoading={loadingNora} />
           </div>
 
@@ -172,10 +189,9 @@ const ProjectDetail = () => {
                     <FileText size={20} className="text-dit-pink" /> Consulter le Rapport
                 </a>
             )}
+
+    
         </div>
-
-                
-
                 {!project.report_pdf_url && !project.github_repository_url && (
                     <p className="text-xs text-slate-400 text-center italic">Aucune ressource publique disponible.</p>
                 )}

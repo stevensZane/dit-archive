@@ -1,4 +1,5 @@
 import { Sparkles, Bot } from 'lucide-react';
+import ReactMarkdown from "react-markdown";
 
 const NoraSummary = ({ summary, isLoading }) => {
   return (
@@ -24,9 +25,11 @@ const NoraSummary = ({ summary, isLoading }) => {
             <div className="h-4 bg-slate-700 rounded w-5/6"></div>
           </div>
         ) : (
-          <p className="text-slate-200 leading-relaxed italic">
-            "{summary || "Nora n'a pas encore analysé ce projet. L'archiveur est en cours..."}"
-          </p>
+          <div className="prose prose-invert max-w-none text-slate-200 italic">
+            <ReactMarkdown>
+              {summary || "Nora n'a pas encore analysé ce projet. L'archiveur est en cours..."}
+            </ReactMarkdown>
+          </div>
         )}
       </div>
     </div>
