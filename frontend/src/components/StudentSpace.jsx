@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Github, Plus, Loader2, X, AlertCircle, Sparkles, Send, CheckCircle2, Clock, ArrowRight } from 'lucide-react';
+import { Github, Plus, Loader2, X, AlertCircle, Sparkles, Send, CheckCircle2, Clock, ArrowRight, Pencil, Trash2, Image as ImageIcon, FileText } from 'lucide-react';
 import api from "./api/axios";
 import Navbar from './Navbar';
 
 const StudentPortal = () => {
   const navigate = useNavigate();
   
-  // --- ÉTATS ---
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,14 +16,26 @@ const StudentPortal = () => {
   const [programs, setPrograms] = useState([]);
   const [years, setYears] = useState([]);
 
+  // --- ÉTATS POUR LES FICHIERS ---
+  const [selectedPdf, setSelectedPdf] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
+
+  // --- ÉTAT DU FORMULAIRE ---
+  const [draft, setDraft] = useState({
+    title: '',
+    description: '',
+    github_url: '',
+    program_id: '',
+    year_id: '',
+    level: 'L3'
+  });
+
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // --- CHARGEMENT INITIAL ---
-  const initPortal = async () => {
-    setFetchLoading(true);
+  const initPortal = async (silent = false) => {
+    if (!silent) setFetchLoading(true);
     setError(null);
     try {
-      // On ne charge plus /technologies, Nora s'en occupe toute seule
       const [projRes, progRes, yearRes] = await Promise.all([
         api.get('/projects/me'),
         api.get('/programs'),
@@ -34,37 +45,91 @@ const StudentPortal = () => {
       setProjects(projRes.data);
       setPrograms(progRes.data);
       setYears(yearRes.data);
+
+      localStorage.setItem("dit_student_projects", JSON.stringify(projRes.data));
+      localStorage.setItem("dit_programs", JSON.stringify(progRes.data));
+      localStorage.setItem("dit_years", JSON.stringify(yearRes.data));
     } catch (err) {
       console.error("Erreur chargement:", err);
-      setError("Erreur lors du chargement des données. Vérifie que le backend est lancé.");
+      setError("Erreur lors du chargement des données.");
     } finally {
       setFetchLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) navigate('/login');
-    else initPortal();
+    if (!localStorage.getItem('token')) {
+      navigate('/login');
+      return;
+    }
+
+    const cachedProj = localStorage.getItem("dit_student_projects");
+    const cachedProg = localStorage.getItem("dit_programs");
+    const cachedYears = localStorage.getItem("dit_years");
+    const savedDraft = localStorage.getItem("dit_upload_draft");
+
+    if (cachedProj) setProjects(JSON.parse(cachedProj));
+    if (cachedProg) setPrograms(JSON.parse(cachedProg));
+    if (cachedYears) setYears(JSON.parse(cachedYears));
+    if (savedDraft) setDraft(JSON.parse(savedDraft));
+
+    if (cachedProj) setFetchLoading(false);
+    initPortal(!!cachedProj);
   }, []);
 
-  // --- SOUMISSION DU FORMULAIRE ---
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    const newDraft = { ...draft, [name]: value };
+    setDraft(newDraft);
+    localStorage.setItem("dit_upload_draft", JSON.stringify(newDraft));
+  };
+
+  // --- SOUMISSION AVEC FORMDATA ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(e.target);
-    // Plus besoin d'ajouter manuellement les technos ici !
+    const formData = new FormData();
+    // 1. Champs textes (on mappe year_id -> academic_year_id pour le backend)
+    formData.append('title', draft.title);
+    formData.append('description', draft.description);
+    formData.append('github_url', draft.github_url);
+    formData.append('program_id', draft.program_id);
+    formData.append('academic_year_id', draft.year_id); 
+    formData.append('level', draft.level);
+
+    // 2. Le PDF
+    if (selectedPdf) {
+      formData.append('report_pdf', selectedPdf);
+    } else {
+      setError("Le rapport PDF est obligatoire.");
+      setLoading(false);
+      return;
+    }
+
+    // 3. Les Images (multiples)
+    if (selectedImages.length > 0) {
+      Array.from(selectedImages).forEach((file) => {
+        formData.append('screenshot_files', file);
+      });
+    }
 
     try {
-      await api.post('/upload', formData, {
+      await api.post('/upload-project', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      
+      // Reset
+      localStorage.removeItem("dit_upload_draft");
+      setDraft({ title: '', description: '', github_url: '', program_id: '', year_id: '', level: 'L3' });
+      setSelectedPdf(null);
+      setSelectedImages([]);
+      
       setIsModalOpen(false);
-      initPortal(); // Rafraîchir la liste
+      initPortal(true); 
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || "Une erreur est survenue lors de l'envoi.";
-      setError(errorMsg);
+      setError(err.response?.data?.detail || "Erreur lors de l'envoi.");
     } finally {
       setLoading(false);
     }
@@ -99,7 +164,7 @@ const StudentPortal = () => {
             <div className="h-[1px] flex-1 bg-slate-200"></div>
           </div>
           
-          {fetchLoading ? (
+          {fetchLoading && projects.length === 0 ? (
             <div className="py-20 flex flex-col items-center gap-4 text-dit-teal opacity-50">
                 <Loader2 size={40} className="animate-spin" />
                 <span className="text-xs font-bold uppercase">Nora consulte les registres...</span>
@@ -107,10 +172,10 @@ const StudentPortal = () => {
           ) : projects.length > 0 ? (
             <div className="grid gap-6">
               {projects.map((p) => (
-                <Link key={p.id} to={`/project/${p.id}`} className="group bg-white border border-slate-100 p-6 rounded-3xl flex justify-between items-center hover:border-dit-pink/30 hover:shadow-xl transition-all">
-                  <div className="flex items-center gap-6">
-                    <div className={`p-4 rounded-2xl ${p.status === 'archived' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                        {p.status === 'archived' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
+                <div key={p.id} className="group relative bg-white border border-slate-100 p-6 rounded-3xl flex justify-between items-center hover:border-dit-pink/30 hover:shadow-xl transition-all">
+                  <Link to={`/project/${p.id}`} className="flex items-center gap-6 flex-1">
+                    <div className={`p-4 rounded-2xl ${p.analysis_status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                        {p.analysis_status === 'completed' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
                     </div>
                     <div>
                       <h3 className="font-bold text-lg text-slate-800 group-hover:text-dit-pink transition-colors">{p.title}</h3>
@@ -118,7 +183,6 @@ const StudentPortal = () => {
                         {p.program?.name} • {p.academic_year?.label}
                       </p>
                       
-                      {/* AFFICHAGE DES TECHNOS RÉCUPÉRÉES PAR LE WORKER */}
                       <div className="flex flex-wrap gap-1.5">
                         {p.technologies_list ? (
                           p.technologies_list.split(', ').slice(0, 4).map(tech => (
@@ -131,14 +195,19 @@ const StudentPortal = () => {
                         )}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${p.status === 'archived' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {p.status === 'archived' ? 'Archivé' : 'En cours'}
-                    </span>
+                  </Link>
+
+                  <div className="flex items-center gap-3 ml-4">
+                    <button className="p-3 text-slate-300 hover:text-dit-teal hover:bg-teal-50 rounded-xl transition-all" title="Modifier">
+                      <Pencil size={18} />
+                    </button>
+                    <button className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Supprimer">
+                      <Trash2 size={18} />
+                    </button>
+                    <div className="w-[1px] h-8 bg-slate-100 mx-1"></div>
                     <ArrowRight size={18} className="text-slate-300 group-hover:text-dit-pink group-hover:translate-x-1 transition-all" />
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           ) : (
@@ -161,7 +230,7 @@ const StudentPortal = () => {
                   <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">
                     Nouveau <span className="text-dit-pink">Dépôt</span>
                   </h2>
-                  <p className="text-slate-500 font-medium mt-1">Lien GitHub + Rapport PDF uniquement.</p>
+                  <p className="text-slate-500 font-medium mt-1">Dites à Nora ce que vous avez créé.</p>
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)} 
@@ -173,7 +242,7 @@ const StudentPortal = () => {
 
               <form onSubmit={handleSubmit} className="p-10 pt-4 space-y-8">
                 {error && (
-                  <div className="p-4 bg-red-50 text-red-600 rounded-2xl flex items-center gap-3 text-sm font-bold border border-red-100 animate-bounce">
+                  <div className="p-4 bg-red-50 text-red-600 rounded-2xl flex items-center gap-3 text-sm font-bold border border-red-100">
                     <AlertCircle size={20} /> {error}
                   </div>
                 )}
@@ -181,43 +250,123 @@ const StudentPortal = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Titre du Projet</label>
-                      <input required name="title" type="text" placeholder="Ex: Dashboard de gestion DIT" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-bold focus:ring-2 focus:ring-dit-teal/20 outline-none transition-all placeholder:text-slate-300" />
+                      <input 
+                        required 
+                        name="title" 
+                        type="text" 
+                        value={draft.title}
+                        onChange={handleInputChange}
+                        placeholder="Ex: Dashboard de gestion DIT" 
+                        className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-bold focus:ring-2 focus:ring-dit-teal/20 outline-none transition-all placeholder:text-slate-300" 
+                      />
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Description</label>
-                      <textarea required name="description" rows="3" placeholder="Objectifs et fonctionnalités clés..." className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700 focus:ring-2 focus:ring-dit-teal/20 outline-none transition-all resize-none"></textarea>
+                      <textarea 
+                        required 
+                        name="description" 
+                        rows="3" 
+                        value={draft.description}
+                        onChange={handleInputChange}
+                        placeholder="Objectifs et fonctionnalités clés..." 
+                        className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 font-medium text-slate-700 focus:ring-2 focus:ring-dit-teal/20 outline-none transition-all resize-none"
+                      ></textarea>
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black uppercase text-dit-pink tracking-[0.2em] ml-1 flex items-center gap-2">
                         <Github size={14}/> URL du Dépôt GitHub (Public)
                       </label>
-                      <input required name="github_url" type="url" placeholder="https://github.com/votre-nom/votre-projet" className="w-full bg-pink-50/30 border border-pink-100 rounded-2xl px-6 py-5 font-bold text-dit-pink focus:ring-2 focus:ring-pink-200 outline-none transition-all" />
+                      <input 
+                        required 
+                        name="github_url" 
+                        type="url" 
+                        value={draft.github_url}
+                        onChange={handleInputChange}
+                        placeholder="https://github.com/votre-nom/votre-projet" 
+                        className="w-full bg-pink-50/30 border border-pink-100 rounded-2xl px-6 py-5 font-bold text-dit-pink focus:ring-2 focus:ring-pink-200 outline-none transition-all" 
+                      />
                   </div>
 
-                  <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 italic">Mémoire / Rapport final (PDF)</label>
-                      <input required type="file" name="report_file" accept=".pdf" className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-dit-pink file:text-white cursor-pointer bg-slate-50 p-4 rounded-2xl" />
+                  {/* SECTION FICHIERS */}
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 italic flex items-center gap-2">
+                        <FileText size={14}/> Rapport (PDF)
+                      </label>
+                      <div className="relative group">
+                        <input 
+                          required 
+                          type="file" 
+                          accept=".pdf" 
+                          onChange={(e) => setSelectedPdf(e.target.files[0])}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                        />
+                        <div className="w-full bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center group-hover:border-dit-teal transition-all">
+                           <span className="text-[10px] font-bold text-slate-400 uppercase">
+                             {selectedPdf ? selectedPdf.name : "Cliquez pour joindre le PDF"}
+                           </span>
+                        </div>
+                      </div>
+                  </div>
+
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-2">
+                        <ImageIcon size={14}/> Captures (Images)
+                      </label>
+                      <div className="relative group">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          multiple 
+                          onChange={(e) => setSelectedImages(e.target.files)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                        />
+                        <div className="w-full bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center group-hover:border-dit-pink transition-all">
+                           <span className="text-[10px] font-bold text-slate-400 uppercase">
+                             {selectedImages.length > 0 ? `${selectedImages.length} images` : "Sélectionner des images"}
+                           </span>
+                        </div>
+                      </div>
                   </div>
 
                   <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Filière</label>
-                      <select required name="program_id" className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold outline-none cursor-pointer appearance-none">
+                      <select 
+                        required 
+                        name="program_id" 
+                        value={draft.program_id}
+                        onChange={handleInputChange}
+                        className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold outline-none cursor-pointer appearance-none"
+                      >
+                          <option value="">Sélectionner</option>
                           {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                   </div>
 
                   <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Année</label>
-                      <select required name="year_id" className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold outline-none cursor-pointer">
+                      <select 
+                        required 
+                        name="year_id" 
+                        value={draft.year_id}
+                        onChange={handleInputChange}
+                        className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold outline-none cursor-pointer"
+                      >
+                          <option value="">Sélectionner</option>
                           {years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
                       </select>
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Niveau</label>
-                      <select required name="level" className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold outline-none cursor-pointer">
+                      <select 
+                        required 
+                        name="level" 
+                        value={draft.level}
+                        onChange={handleInputChange}
+                        className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold outline-none cursor-pointer"
+                      >
                           <option value="L3">Licence 3</option>
                           <option value="M1">Master 1</option>
                           <option value="M2">Master 2</option>

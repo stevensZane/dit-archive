@@ -34,6 +34,7 @@ const Navbar = () => {
         {/* Actions - Texte Noir sur fond blanc = Visibilité 100% */}
         <div className="flex items-center space-x-8">
           <Link to="/home" className="text-gray-900 font-semibold hover:text-dit-teal transition">Accueil</Link>
+          <Link to="/leaderboard" className="text-gray-900 font-semibold hover:text-dit-teal transition">Leaderboard</Link>
           <Link to="/explore" className="text-gray-900 font-semibold hover:text-dit-teal transition">Explore</Link>
           <Link to="/nora" className="flex items-center gap-1 text-gray-900 font-semibold hover:text-dit-teal transition"><Bot /> Nora</Link>
           <Link to={user?.role === "admin" ? "/admin-space" : "/dashboard"}>
