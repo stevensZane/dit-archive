@@ -3,23 +3,15 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Q
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from github import Github
-import shutil
-import uuid
-import requests
-from fastapi.responses import StreamingResponse
-from io import BytesIO
-from typing import Optional
+from typing import Optional, List
 from database import *
 from auth_utils import *
 from services import *
 from auth_utils import get_current_user
-from urllib.parse import quote
-from fastapi.responses import StreamingResponse
-from io import BytesIO
-import requests
+from fastapi.responses import RedirectResponse
 import os
-from urllib.parse import unquote, quote
 from ai import call_groq_api
+from cloudinary_utils import *
 
 # Config GitHub
 g = Github(os.getenv("GITHUB_TOKEN"))
@@ -30,81 +22,104 @@ router = APIRouter(
     tags=["projects"]
 )
 
+
 @router.post("/upload")
-async def upload_project(
+async def create_new_project(
     background_tasks: BackgroundTasks,
     title: str = Form(...),
-    description: str = Form(None),
-    github_url: str = Form(...),
+    description: str = Form(...),
+    github_url: str = Form(None),
+    academic_year_id: int = Form(...),
     program_id: int = Form(...),
-    year_id: int = Form(...),
     level: str = Form(...),
-    report_file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    report_pdf: UploadFile = File(...), # Obligatoire
+    screenshot_files: List[UploadFile] = File(None), # Optionnel, plusieurs fichiers
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
-    # 1. Validations
-    if "github.com" not in github_url:
-        raise HTTPException(status_code=400, detail="Lien GitHub invalide")
+    # 1. Upload du PDF sur Cloudinary
+    pdf_url = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
     
-    clean_git_url = github_url.split("/tree/")[0].strip().rstrip("/")
+    # 2. Upload des Screenshots (Boucle sur la liste)
+    screenshot_urls = []
+    if screenshot_files:
+        for img in screenshot_files:
+            url = upload_to_cloudinary(img.file, folder="projects/screenshots")
+            if url:
+                screenshot_urls.append(url)
     
+    # On transforme la liste en chaîne séparée par des virgules pour notre champ Text
+    screenshots_str = ",".join(screenshot_urls) if screenshot_urls else None
 
-    # 2. Création Projet
+    # 3. Création de l'entrée en Base de Données
     new_project = Project(
         title=title,
         description=description,
-        github_repository_url=clean_git_url,
+        github_repository_url=github_url,
+        report_pdf_url=pdf_url,
+        screenshots=screenshots_str,
+        academic_year_id=academic_year_id,
         program_id=program_id,
-        academic_year_id=year_id,
         level=level,
         owner_id=current_user.id,
-        upload_method="github",
-        status="pending"
+        # On initialise les statuts pour Nora
+        analysis_status="pending",
+        views_count=0,
+        downloads_count=0
     )
-    
+
     db.add(new_project)
     db.commit()
     db.refresh(new_project)
+    
+    # 3. On lance l'analyse GitHub en tâche de fond
+    # L'utilisateur reçoit sa réponse alors que Nora commence son job
+    if github_url:
+        background_tasks.add_task(process_and_archive_project, new_project.id)
 
-    # 3. Sauvegarde temporaire du PDF
-    os.makedirs("temp_uploads", exist_ok=True)
-    temp_pdf_path = f"temp_uploads/report_{new_project.id}_{uuid.uuid4().hex[:8]}.pdf"
-    with open(temp_pdf_path, "wb") as buffer:
-        shutil.copyfileobj(report_file.file, buffer)
+    return {
+        "message": "Projet créé avec succès !",
+        "project_id": new_project.id,
+        "pdf_url": pdf_url
+    }
 
-    # 4. Lancement du worker (Le nouveau worker léger sans clonage)
-    background_tasks.add_task(
-        process_and_archive_project,
-        project_id=new_project.id,
-        repo_archive=repo, 
-        git_url=clean_git_url,
-        pdf_path=temp_pdf_path
-    )
-
-    return {"status": "success", "project_id": new_project.id}
 
 @router.get("/projects/search")
 def search_projects(
-    q: str = Query(..., min_length=2), 
+    q: str = Query(None), 
     db: Session = Depends(get_db)
 ):
-    # Recherche insensible à la casse dans le titre, la description et les technos
-    results = db.query(Project).join(Project.technologies, isouter=True).filter(
-        Project.status == "approved",
-        or_(
-            Project.title.ilike(f"%{q}%"),
-            Project.description.ilike(f"%{q}%"),
-            Technology.name.ilike(f"%{q}%")
-        )
+    # On autorise la recherche dès 1 caractère si tu veux, 
+    # mais attention aux performances. Ici on garde 2.
+    if not q or len(q) < 2:
+        return []
+
+    search_term = f"%{q}%"
+
+    # On commence la requête sur Project
+    # On fait un join simple sur User (Auteur)
+    query = db.query(Project).join(User, Project.owner_id == User.id, isouter=True)
+
+    # Construction du filtre
+    # Pour les technologies, on utilise .any() c'est beaucoup plus robuste
+    conditions = [
+        Project.title.ilike(search_term),
+        Project.description.ilike(search_term),
+        User.first_name.ilike(search_term),
+        User.last_name.ilike(search_term),
+        Project.technologies.any(Technology.name.ilike(search_term)) # <--- LA CLÉ
+    ]
+
+    results = query.filter(
+        # Project.status == "approved", # À décommenter plus tard
+        or_(*conditions)
     ).distinct().all()
 
     return [{
         "id": p.id,
         "title": p.title,
-        "program": p.program.name,
-        "year": p.academic_year.label,
         "author": f"{p.owner.first_name} {p.owner.last_name}" if p.owner else "DIT",
+        "program": p.program.name if p.program else "N/A",
         "technologies": [t.name for t in p.technologies]
     } for p in results]
 
@@ -133,81 +148,31 @@ def get_my_projects(current_user: User = Depends(get_current_user), db: Session 
     return results
 
 @router.get("/projects/{project_id}/report")
-def get_project_report(project_id: int, db: Session = Depends(get_db)):
+async def get_project_report(project_id: int, db: Session = Depends(get_db)):
+    # 1. Récupération du projet en base
     project = db.query(Project).filter(Project.id == project_id).first()
 
-    # --- 1. VALIDATION ---
-    if not project or not project.report_pdf_url:
+    # 2. Validation : Le projet existe-t-il et a-t-il un PDF ?
+    if not project:
         raise HTTPException(
-            status_code=404,
-            detail="Aucun rapport archivé pour ce projet."
+            status_code=404, 
+            detail="Projet non trouvé."
         )
-
-    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-    ORG = "DIT-Archives"
-    REPO = "archive-projet"
-
-    # --- 2. NETTOYAGE DU PATH ---
-    path = project.report_pdf_url.strip()
-
-    # Si jamais une URL complète traîne encore (ancienne donnée)
-    if "github" in path:
-        for separator in ["/main/", "/master/", "/blob/main/", "/blob/master/"]:
-            if separator in path:
-                path = path.split(separator)[-1]
-                break
-
-    # Suppression des paramètres et nettoyage
-    path = path.split("?")[0].lstrip("/")
-    clean_path = quote(unquote(path), safe="/")
-
-    # --- 3. CONSTRUCTION URL FINALE ---
-    target_url = f"https://raw.githubusercontent.com/{ORG}/{REPO}/main/{clean_path}"
-
-    print(f"[DEBUG] URL finale --> {target_url}")
-
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3.raw"
-    }
-
-    try:
-        # --- 4. REQUÊTE GITHUB ---
-        response = requests.get(target_url, headers=headers, timeout=15)
-
-        # fallback si branche master
-        if response.status_code == 404:
-            alt_url = target_url.replace("/main/", "/master/")
-            print(f"[DEBUG] fallback master --> {alt_url}")
-            response = requests.get(alt_url, headers=headers, timeout=15)
-
-        # --- 5. GESTION ERREUR ---
-        if response.status_code != 200:
-            print(f"❌ GitHub {response.status_code} : {target_url}")
-            raise HTTPException(
-                status_code=404,
-                detail="Le fichier PDF n'existe pas sur le dépôt GitHub."
-            )
-
-        # --- 6. RETOUR PDF ---
-        return StreamingResponse(
-            BytesIO(response.content),
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": "inline; filename=rapport.pdf"
-            }
-        )
-
-    # ⚠️ CRUCIAL : ne pas transformer les 404 en 500
-    except HTTPException as http_exc:
-        raise http_exc
-
-    except Exception as e:
-        print(f"💥 ERREUR SERVEUR : {str(e)}")
+    
+    if not project.report_pdf_url:
         raise HTTPException(
-            status_code=500,
-            detail="Erreur interne lors du chargement du PDF."
+            status_code=404, 
+            detail="Ce projet n'a pas encore de rapport PDF archivé."
         )
+
+    # 3. Logique Cloudinary
+    # Puisque 'report_pdf_url' contient déjà l'URL complète (https://res.cloudinary.com/...)
+    # On fait une redirection 307 (Temporary Redirect)
+    # Cela permet au navigateur d'ouvrir directement le lien Cloudinary
+    
+    print(f"[DEBUG] Redirection vers le rapport : {project.report_pdf_url}")
+    
+    return RedirectResponse(url=project.report_pdf_url)
 
 @router.get("/projects/{project_id}")
 def get_project(project_id: int, db: Session = Depends(get_db)):

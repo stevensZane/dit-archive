@@ -1,23 +1,31 @@
 import resend
 import os
-from fastapi import BackgroundTasks
+from dotenv import load_dotenv
 
+load_dotenv()
+
+# Configure ta clé API (Idéalement dans un fichier .env)
 resend.api_key = os.getenv("RESEND_API_KEY")
 
-def send_welcome_email(email: str, name: str):
+def send_welcome_email(to_email: str, first_name: str):
     try:
         params = {
-            "from": "Nora du DIT <onboarding@resend.dev>", # Ou ton domaine vérifié
-            "to": [email],
-            "subject": "Bienvenue sur la plateforme Archive du DIT !",
+            "from": "Acme <onboarding@resend.dev>", # Au début, tu ne peux envoyer que depuis cette adresse
+            "to": [to_email],
+            "subject": "Bienvenue sur la plateforme !",
             "html": f"""
-                <h1>Félicitations {name} !</h1>
-                <p>Ton compte a été créé avec succès.</p>
-                <p>Tu peux maintenant interroger Nora sur toutes les archives du DIT.</p>
-                <br/>
-                <p>À bientôt,<br/>L'équipe DIT</p>
+                <div style="font-family: sans-serif; color: #333;">
+                    <h2>Salut {first_name} ! 👋</h2>
+                    <p>On est ravi de t'accueillir. Ton compte est maintenant actif.</p>
+                    <p>Tu peux dès maintenant explorer les projets ou soumettre le tien.</p>
+                    <hr />
+                    <p style="font-size: 12px; color: #666;">Ceci est un message automatique de ton portail étudiant.</p>
+                </div>
             """,
         }
-        resend.Emails.send(params)
+
+        email = resend.Emails.send(params)
+        return email
     except Exception as e:
-        print(f"❌ Erreur envoi mail: {e}")
+        print(f"Erreur lors de l'envoi de l'email : {e}")
+        return None

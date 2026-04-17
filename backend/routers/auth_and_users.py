@@ -1,11 +1,12 @@
 from pydantic_models import *
 from auth_utils import *
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from database import *
 from auth_utils import *
 from services import *
+from mailer import send_welcome_email
 
 router = APIRouter(
     prefix="",
@@ -14,27 +15,61 @@ router = APIRouter(
 
 
 @router.post("/users/signup")
-def signup(user_data: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == user_data.email).first():
+def signup(user_data: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # 1. Nettoyage et vérification
+    email_clean = user_data.email.lower().strip()
+    if db.query(User).filter(User.email == email_clean).first():
         raise HTTPException(status_code=400, detail="Email déjà utilisé")
     
+    # 2. Création manuelle (Zéro ambiguïté)
     new_user = User(
-        **user_data.dict(exclude={"password"}),
-        password_hash=hash_password(user_data.password),
-        role="student" # Forcé pour le signup public
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        email=email_clean,
+        password_hash=hash_password(user_data.password), # On hash ici
+        academic_year_id=user_data.academic_year_id,
+        program_id=user_data.program_id,
+        level=user_data.level,
+        role="student"
     )
+    
     db.add(new_user)
-    db.commit()
+    
+    try:
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        print(f"Erreur DB : {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la création")
+
+    # 3. Mail
+    background_tasks.add_task(send_welcome_email, new_user.email, new_user.first_name)
+    
     return {"message": "Compte créé"}
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Debug: voir ce qui arrive du front
+    print(f"Tentative de connexion pour : {form_data.username}") 
+    
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+    
+    if not user:
+        print("Erreur : Utilisateur non trouvé en base")
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
     
+    if not verify_password(form_data.password, user.password_hash):
+        print(f"Erreur : Le mot de passe ne match pas le hash pour {user.email}")
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    
+    print("Succès : Login validé")
     token = create_access_token(data={"sub": user.email, "role": user.role})
-    return {"access_token": token, "token_type": "bearer", "user": {"role": user.role, "name": user.first_name}}
+    return {
+        "access_token": token, 
+        "token_type": "bearer", 
+        "user": {"role": user.role, "name": user.first_name}
+    }
 
 @router.post("/admin/users", status_code=201)
 def admin_create_user(user_in: UserCreateAdmin, db: Session = Depends(get_db), admin: User = Depends(require_role("admin"))):

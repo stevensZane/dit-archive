@@ -36,7 +36,13 @@ class User(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String(255), nullable=False) # On force 255 pour être large
+    avatar_url = Column(String, nullable=True) # URL Cloudinary
+    
+    # --- Champs Analytics pour le Leaderboard ---
+    total_points = Column(Integer, default=0)
+    rank_title = Column(String, default="Débutant") # Ex: "Architecte", "Expert"
+    
     role = Column(String, default="student") 
     level = Column(String) # Niveau actuel de l'étudiant
     program_id = Column(Integer, ForeignKey("programs.id"))
@@ -48,37 +54,44 @@ class User(Base):
 
 class Project(Base):
     __tablename__ = "projects"
+    
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     description = Column(Text)
-    status = Column(String, default="pending") 
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # --- GitHub & Metadata (Le nouveau cœur) ---
-    upload_method = Column(String, default="github") # On privilégie github
+    # --- Workflow Automatisé ---
+    # analysis_status: 'pending', 'processing', 'completed', 'failed'
+    analysis_status = Column(String, default="pending") 
+    is_historical = Column(Boolean, default=False) # Pour les vieux projets importés
+    
+    # --- Cloudinary (URLs Directes) ---
+    report_pdf_url = Column(String, nullable=True) 
+    screenshots = Column(Text, nullable=True) # URLs Cloudinary séparées par des virgules
+    
+    # --- Metadata Nora & GitHub (Remplis par le ProjectAnalyser) ---
     github_repository_url = Column(String, nullable=True)
-    report_pdf_url = Column(String, nullable=True)
-    readme_content = Column(Text, nullable=True) # Stocké pour les recherches de Nora
-    primary_language = Column(String, nullable=True) # Récupéré via API GitHub
-    technologies_list = Column(String, nullable=True)
-    ai_summary = Column(Text, nullable=True) # Le résumé généré par Nora
-    is_historical = Column(Boolean, default=False)
-    rejection_reason = Column(Text, nullable=True)
+    readme_content = Column(Text, nullable=True) 
+    primary_language = Column(String, nullable=True) 
+    technologies_list = Column(String, nullable=True) # Ex: "React, FastAPI"
+    ai_summary = Column(Text, nullable=True) 
+    nora_score = Column(Float, default=0.0) 
+
+    # --- Analytics Leaderboard ---
+    views_count = Column(Integer, default=0)
+    downloads_count = Column(Integer, default=0)
     
     # --- Organisation ---
-    level = Column(String) # L1, L2, L3, M1, M2
+    level = Column(String) 
     academic_year_id = Column(Integer, ForeignKey("academic_years.id"))
     program_id = Column(Integer, ForeignKey("programs.id"))
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    author_name = Column(String, nullable=True) # Pour les archives historiques sans User lié
-    
+    author_name = Column(String, nullable=True) # Si import sans compte utilisateur
+
     # --- Relations ---
     academic_year = relationship("AcademicYear", back_populates="projects")
     program = relationship("Program", back_populates="projects")
     owner = relationship("User", back_populates="projects")
-    # On garde les fichiers pour stocker uniquement les rapports PDF
-    files = relationship("ProjectFile", back_populates="project", cascade="all, delete-orphan")
-    technologies = relationship("Technology", secondary=project_technologies, back_populates="projects")
     comments = relationship("Comment", back_populates="project", cascade="all, delete-orphan")
     likes = relationship("Like", back_populates="project", cascade="all, delete-orphan")
     
