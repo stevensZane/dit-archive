@@ -8,7 +8,7 @@ from auth_utils import *
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
 import shutil
 import requests
-
+from database import Project
 
 router = APIRouter(
     prefix="",
@@ -130,7 +130,7 @@ async def auto_ingest_project(project_id: int, background_tasks: BackgroundTasks
     """Récupère le mémoire du projet et l'envoie à Nora."""
     
     project = db.query(Project).filter(Project.id == project_id).first()
-    if not project or not project.pdf_url:
+    if not project or not project.report_pdf_url:
         raise HTTPException(status_code=404, detail="Projet ou PDF introuvable")
 
     # Chemin local temporaire
@@ -139,7 +139,7 @@ async def auto_ingest_project(project_id: int, background_tasks: BackgroundTasks
 
     # On définit la logique de téléchargement + traitement
     def full_ingestion_flow():
-        if download_pdf(project.pdf_url, local_pdf):
+        if download_pdf(project.report_pdf_url, local_pdf):
             process_pdf_logic(local_pdf, metadata={
                 "project_id": project_id,
                 "title": project.title,
@@ -156,16 +156,16 @@ async def auto_ingest_project(project_id: int, background_tasks: BackgroundTasks
 def process_pdf_logic(file_path: str, metadata: dict):
     """La cuisine interne : PDF -> Texte -> Chunks -> Vecteurs -> ChromaDB."""
     try:
-        # 1. Charger
         loader = PyMuPDFLoader(file_path)
         documents = loader.load()
-        
-        # 2. Découper
         chunks = text_splitter.split_documents(documents)
         
-        # 3. Ajouter les métadonnées
         for chunk in chunks:
+            # On s'assure d'avoir un nom lisible pour le frontend
+            clean_name = metadata.get('title') or metadata.get('source') or "Document"
             chunk.metadata.update(metadata)
+        chunk.metadata["title"] = clean_name # On force le titre pour le GET
+        chunk.metadata["source"] = clean_name # On force la source pour le DELETE
             
         # 4. Initialiser la DB et ajouter les documents
         # Utiliser .from_documents sur le même persist_directory va APPEND (ajouter) 
@@ -175,7 +175,6 @@ def process_pdf_logic(file_path: str, metadata: dict):
             embedding=embeddings, 
             persist_directory=CHROMA_PATH
         )
-        print(f"✅ Nora a appris : {metadata.get('title', 'Document manuel')}")
         
     except Exception as e:
         print(f"❌ Erreur lors du process_pdf: {e}")
@@ -184,3 +183,46 @@ def process_pdf_logic(file_path: str, metadata: dict):
         if os.path.exists(file_path):
             os.remove(file_path)
             print(f"🗑️ Nettoyage : {file_path} supprimé.")
+
+@router.get("/chatbot/documents")
+async def list_nora_documents():
+    """Récupère la liste des documents uniques ingérés par Nora."""
+    try:
+        vector_db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        
+        # On récupère toutes les métadonnées de la collection
+        data = vector_db.get()
+        metadatas = data.get('metadatas', [])
+        
+        # On extrait les noms de fichiers/titres uniques
+        unique_docs = {}
+        for meta in metadatas:
+            # On utilise le 'source' ou 'title' comme clé unique
+            name = meta.get('title') or meta.get('source', 'Document inconnu')
+            if name not in unique_docs:
+                unique_docs[name] = {
+                    "id": name, # On utilise le nom comme ID pour la suppression simple
+                    "name": name,
+                    "created_at": "Archives DIT" # Chroma ne stocke pas la date par défaut
+                }
+        
+        return list(unique_docs.values())
+    except Exception as e:
+        print(f"❌ Erreur listage: {e}")
+        return []
+
+@router.delete("/chatbot/documents/{doc_name}")
+async def delete_nora_document(doc_name: str):
+    """Supprime un document de la mémoire de Nora via son nom/source."""
+    try:
+        vector_db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        
+        # Suppression par filtre sur les métadonnées
+        # Attention : On teste sur 'title' ET 'source' pour être sûr
+        vector_db.delete(where={"source": doc_name})
+        # Si tu as stocké sous 'title', tu peux aussi faire :
+        # vector_db.delete(where={"title": doc_name})
+        
+        return {"message": f"Document {doc_name} oublié par Nora."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'oubli : {str(e)}")

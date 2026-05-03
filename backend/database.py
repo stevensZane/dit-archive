@@ -39,6 +39,10 @@ class User(Base):
     password_hash = Column(String(255), nullable=False) # On force 255 pour être large
     avatar_url = Column(String, nullable=True) # URL Cloudinary
     
+    # user_name = Column(String, nullable=False)
+    # last_seen = Column(String, nullable=False)
+    
+    
     # --- Champs Analytics pour le Leaderboard ---
     total_points = Column(Integer, default=0)
     rank_title = Column(String, default="Débutant") # Ex: "Architecte", "Expert"
@@ -94,6 +98,9 @@ class Project(Base):
     owner = relationship("User", back_populates="projects")
     comments = relationship("Comment", back_populates="project", cascade="all, delete-orphan")
     likes = relationship("Like", back_populates="project", cascade="all, delete-orphan")
+    # À ajouter dans la classe Project pour corriger ton erreur :
+    files = relationship("ProjectFile", back_populates="project", cascade="all, delete-orphan")
+    technologies = relationship("Technology", secondary=project_technologies, back_populates="projects")
     
 class ProjectFile(Base):
     __tablename__ = "project_files"

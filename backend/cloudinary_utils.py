@@ -14,18 +14,27 @@ cloudinary.config(
 )
 
 def upload_to_cloudinary(file, folder="dit_archives"):
-    """
-    Prend un fichier (UploadFile de FastAPI) et l'envoie sur Cloudinary.
-    Retourne l'URL sécurisée.
-    """
     try:
-        # resource_type="auto" est CRUCIAL pour que Cloudinary accepte les PDF
+        # On ajoute 'type="upload"' pour forcer l'accès public
+        # On peut aussi ajouter 'flags="attachment"' si on veut forcer le téléchargement,
+        # mais pour l'affichage, on reste standard.
         response = cloudinary.uploader.upload(
             file,
             folder=folder,
-            resource_type="auto"
+            resource_type="auto",
+            type="upload", # Assure que le fichier est public
+            access_mode="public" # Double sécurité
         )
-        return response.get("secure_url")
+        
+        url = response.get("secure_url")
+        
+        # Petit hack : Si c'est un PDF, Cloudinary oublie parfois l'extension 
+        # dans l'URL sécurisée selon la version de l'API. On la force.
+        if url and ".pdf" not in url.lower():
+             # Optionnel : Cloudinary peut transformer l'URL selon le resource_type
+             pass 
+
+        return url
     except Exception as e:
         print(f"❌ Erreur Cloudinary: {e}")
         return None

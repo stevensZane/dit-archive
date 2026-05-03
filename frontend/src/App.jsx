@@ -99,8 +99,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-
-        {/* 3. Admin : Uniquement pour les admins */}
         
 
         {/* Redirections automatiques */}

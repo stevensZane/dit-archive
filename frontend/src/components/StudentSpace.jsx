@@ -116,7 +116,7 @@ const StudentPortal = () => {
     }
 
     try {
-      await api.post('/upload-project', formData, {
+      await api.post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       

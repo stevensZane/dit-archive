@@ -1,5 +1,6 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { LogOut, Bot } from 'lucide-react';
+import NoraAvatar from './NoraAvatar';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ const Navbar = () => {
           <Link to="/home" className="text-gray-900 font-semibold hover:text-dit-teal transition">Accueil</Link>
           <Link to="/leaderboard" className="text-gray-900 font-semibold hover:text-dit-teal transition">Leaderboard</Link>
           <Link to="/explore" className="text-gray-900 font-semibold hover:text-dit-teal transition">Explore</Link>
-          <Link to="/nora" className="flex items-center gap-1 text-gray-900 font-semibold hover:text-dit-teal transition"><Bot /> Nora</Link>
+          <Link to="/nora" className="flex items-center gap-1 text-gray-900 font-semibold hover:text-dit-teal transition"><NoraAvatar size="sm" /> Nora</Link>
           <Link to={user?.role === "admin" ? "/admin-space" : "/dashboard"}>
             <div className="flex items-center space-x-4 border-l pl-6 border-gray-200">
               <div className="bg-gray-100 min-h-10 min-w-10 px-4 py-2 rounded-full flex items-center justify-center border border-gray-200">

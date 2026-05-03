@@ -133,7 +133,7 @@ def get_my_projects(current_user: User = Depends(get_current_user), db: Session 
         results.append({
             "id": p.id, 
             "title": p.title,
-            "status": p.status, # CRUCIAL pour l'affichage des badges (archived/pending)
+            "status": p.analysis_status, # CRUCIAL pour l'affichage des badges (archived/pending)
             "technologies_list": p.technologies_list, # La string scanée par Nora
             "program": {
                 "name": p.program.name if p.program else "N/A"
@@ -148,30 +148,12 @@ def get_my_projects(current_user: User = Depends(get_current_user), db: Session 
     return results
 
 @router.get("/projects/{project_id}/report")
-async def get_project_report(project_id: int, db: Session = Depends(get_db)):
-    # 1. Récupération du projet en base
+def get_project_report(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
+    if not project or not project.report_pdf_url:
+        raise HTTPException(status_code=404, detail="Rapport non trouvé")
 
-    # 2. Validation : Le projet existe-t-il et a-t-il un PDF ?
-    if not project:
-        raise HTTPException(
-            status_code=404, 
-            detail="Projet non trouvé."
-        )
-    
-    if not project.report_pdf_url:
-        raise HTTPException(
-            status_code=404, 
-            detail="Ce projet n'a pas encore de rapport PDF archivé."
-        )
-
-    # 3. Logique Cloudinary
-    # Puisque 'report_pdf_url' contient déjà l'URL complète (https://res.cloudinary.com/...)
-    # On fait une redirection 307 (Temporary Redirect)
-    # Cela permet au navigateur d'ouvrir directement le lien Cloudinary
-    
-    print(f"[DEBUG] Redirection vers le rapport : {project.report_pdf_url}")
-    
+    # On laisse le navigateur de l'étudiant gérer l'ouverture
     return RedirectResponse(url=project.report_pdf_url)
 
 @router.get("/projects/{project_id}")
@@ -215,7 +197,7 @@ def get_all_projects(
         query = query.filter(Project.academic_year_id == year_id)
     
     # On ne montre que ce qui est archivé/approuvé sur l'Explore
-    query = query.filter(Project.status.in_(["archived", "approved"]))
+    query = query.filter(Project.analysis_status.in_(["completed", "archived"]))
     
     projects = query.order_by(Project.created_at.desc()).all()
 
@@ -250,7 +232,6 @@ def toggle_like(
         db.commit()
         return {"message": "Liked", "liked": True}
     
-
 @router.get("/projects/{project_id}/ai-summary")
 async def get_project_ai_summary(project_id: int, db: Session = Depends(get_db)):
     project = db.get(Project, project_id)

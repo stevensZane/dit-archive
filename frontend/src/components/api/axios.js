@@ -11,9 +11,9 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+  }, (error) => {
+    return Promise.reject(error);
+  });
 
 // INTERCEPTEUR RÉPONSE : On attrape la 401
 api.interceptors.response.use(
