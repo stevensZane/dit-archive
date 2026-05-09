@@ -1,37 +1,50 @@
-import { Sparkles, Bot } from 'lucide-react';
+import { MessageCircle, Repeat2, Heart, Share, MoreHorizontal } from 'lucide-react';
 import ReactMarkdown from "react-markdown";
+import NoraAvatar from "./NoraAvatar";
 
 const NoraSummary = ({ summary, isLoading }) => {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 text-white shadow-xl">
-      {/* Petit effet visuel en fond */}
-      <div className="absolute top-0 right-0 p-4 opacity-10">
-        <Bot size={120} />
+    <div className="bg-[#004751] border border-slate-800 rounded-3xl p-6 shadow-2xl font-sans">
+      
+      {/* HEADER : Avatar + Nom + Handle */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex gap-3">
+          <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-700 bg-slate-800 flex-shrink-0">
+            <img 
+              src="/nora-profile.png"
+              alt="Nora" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-white hover:underline cursor-pointer">Nora</span>
+              {/* <span className="text-slate-500 text-sm"></span> */}
+            </div>
+            <span className="text-slate-500 text-sm">@nora_ia_dit</span>
+          </div>
+        </div>
+        <MoreHorizontal className="text-slate-600 cursor-pointer" size={20} />
       </div>
 
-      <div className="relative z-10">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="bg-dit-pink p-2 rounded-lg">
-            <Sparkles size={18} className="text-white" />
-          </div>
-          <span className="font-black uppercase tracking-widest text-xs text-slate-400">
-            Analyse de Nora
-          </span>
-        </div>
-
+      {/* CONTENU : Le texte pur */}
+      <div className="mb-4">
         {isLoading ? (
-          <div className="space-y-2 animate-pulse">
-            <div className="h-4 bg-slate-700 rounded w-full"></div>
-            <div className="h-4 bg-slate-700 rounded w-5/6"></div>
+          <div className="space-y-3 animate-pulse py-2">
+            <div className="h-4 bg-slate-800 rounded w-full"></div>
+            <div className="h-4 bg-slate-800 rounded w-4/5"></div>
           </div>
         ) : (
-          <div className="prose prose-invert max-w-none text-slate-200 italic">
+          <div className="text-[19px] leading-relaxed text-slate-100 prose prose-invert prose-slate max-w-none 
+                prose-p:mb-4 prose-headings:text-white prose-headings:text-xl prose-headings:font-bold 
+                prose-strong:text-white prose-li:marker:text-slate-500">
             <ReactMarkdown>
-              {summary || "Nora n'a pas encore analysé ce projet. L'archiveur est en cours..."}
+              {summary || "Nora n'a pas encore analysé ce projet."}
             </ReactMarkdown>
           </div>
         )}
       </div>
+
     </div>
   );
 };

@@ -1,8 +1,6 @@
-import os
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
-from github import Github
 from typing import Optional, List
 from database import *
 from auth_utils import *
@@ -12,10 +10,6 @@ from fastapi.responses import RedirectResponse
 import os
 from ai import call_groq_api
 from cloudinary_utils import *
-
-# Config GitHub
-g = Github(os.getenv("GITHUB_TOKEN"))
-repo = g.get_repo(os.getenv("REPO_NAME"))
 
 router = APIRouter(
     prefix="",
@@ -29,9 +23,6 @@ async def create_new_project(
     title: str = Form(...),
     description: str = Form(...),
     github_url: str = Form(None),
-    academic_year_id: int = Form(...),
-    program_id: int = Form(...),
-    level: str = Form(...),
     report_pdf: UploadFile = File(...), # Obligatoire
     screenshot_files: List[UploadFile] = File(None), # Optionnel, plusieurs fichiers
     db: Session = Depends(get_db),
@@ -58,9 +49,9 @@ async def create_new_project(
         github_repository_url=github_url,
         report_pdf_url=pdf_url,
         screenshots=screenshots_str,
-        academic_year_id=academic_year_id,
-        program_id=program_id,
-        level=level,
+        academic_year_id=current_user.academic_year_id,
+        program_id=current_user.program_id,
+        level=current_user.level,
         owner_id=current_user.id,
         # On initialise les statuts pour Nora
         analysis_status="pending",
@@ -83,6 +74,58 @@ async def create_new_project(
         "pdf_url": pdf_url
     }
 
+@router.put("/projects/{project_id}")
+async def update_project(
+    project_id: int,
+    title: str = Form(...),
+    description: str = Form(...),
+    github_url: str = Form(...),
+    report_pdf: Optional[UploadFile] = File(None),
+    screenshot_files: Optional[List[UploadFile]] = File(None),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Récupération (Vérifie bien si c'est owner_id ou user_id dans ton modèle)
+    project = db.query(Project).filter(Project.id == project_id).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet non trouvé")
+
+    if project.owner_id != current_user.id: # Aligné sur ton POST
+        raise HTTPException(status_code=403, detail="Action non autorisée")
+
+    # 2. Mise à jour des champs simples
+    project.title = title
+    project.description = description
+    project.github_repository_url = github_url # Aligné sur ton POST
+
+    # 3. Nouveau PDF (uniquement si fourni)
+    if report_pdf:
+        # Utilise la même fonction que le POST
+        new_pdf_url = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
+        project.report_pdf_url = new_pdf_url
+
+    # 4. Nouvelles Images (uniquement si fournies)
+    if screenshot_files:
+        new_screenshot_urls = []
+        for img in screenshot_files:
+            url = upload_to_cloudinary(img.file, folder="projects/screenshots")
+            if url:
+                new_screenshot_urls.append(url)
+        
+        if new_screenshot_urls:
+            # Choix : soit on remplace tout, soit on ajoute à l'existant
+            # Ici, on ajoute à la chaîne existante (format CSV)
+            current_imgs = project.screenshots + "," if project.screenshots else ""
+            project.screenshots = current_imgs + ",".join(new_screenshot_urls)
+
+    db.commit()
+    db.refresh(project)
+    
+    return {
+        "message": "Projet mis à jour avec succès", 
+        "project_id": project.id
+    }
 
 @router.get("/projects/search")
 def search_projects(

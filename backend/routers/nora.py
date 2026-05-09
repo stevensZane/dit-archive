@@ -8,7 +8,8 @@ from auth_utils import *
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
 import shutil
 import requests
-from database import Project
+from database import Project, Program, User
+from system_prompts import get_nora_chat_system_prompt
 
 router = APIRouter(
     prefix="",
@@ -20,7 +21,7 @@ embeddings = NomicEmbeddings(
     nomic_api_key=os.getenv("NOMIC_API_KEY")
 )
 
-# Pour le cerveau (LLM), on passe sur Groq avec Llama 3.3 (le plus costaud)
+# Pour le cerveau (LLM), on passe sur Groq avec Llama 3.3
 llm = ChatGroq(
     temperature=0.1, # On reste précis pour une archive
     model_name="llama-3.3-70b-versatile", 
@@ -31,7 +32,7 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=20
 CHROMA_PATH = "./nora_vectors"
 
 @router.post("/chatbot/ask")
-async def ask_nora(request: ChatRequest):
+async def ask_nora(request: ChatRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         # 1. Recherche dans ChromaDB
         vector_db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
@@ -56,18 +57,17 @@ async def ask_nora(request: ChatRequest):
         context = "\n\n---\n\n".join(context_parts)
 
         # 3. LE SYSTEM PROMPT (Tes règles d'or)
-        system_instructions = f"""
-        Tu es Nora, l'IA experte du DIT. Ton but est de synthétiser les archives du Dakar Institute of Technology.
+        program_name = db.query(Program.name).filter(Program.id == current_user.program_id).scalar() or "Big Data"
+        
+        # Dans routers/nora.py
 
-        RÈGLES DE RÉPONSE ET CITATION :
-        1. Analyse le contexte fourni pour répondre. Si l'info n'y est pas, dis-le poliment.
-        2. SYNTHÈSE : Ne liste pas les sources une par une si elles disent la même chose. Regroupe tes idées.
-        3. CITATION DISCRÈTE : Cite les sources entre parenthèses ou en fin de phrase, par exemple : (Source: Projet Riz, 2023). 
-        4. PERTINENCE : Ne cite un projet que si l'information que tu donnes provient directement de lui. Si tu fais une réponse générale basée sur 3 projets, écris "Selon les archives des projets X, Y et Z..." au début.
-        5. STYLE : Reste concise. L'utilisateur veut une réponse, pas une bibliographie.
-        6. STRUCTURE : Utilise des listes à puces (-) pour les énumérations.
-        7. EMPHASE : Mets en **gras** les dates, les chiffres clés, les noms de technologies et les noms propres.
-        CONTEXTE DES ARCHIVES :
+        system_instructions = f"""
+        {get_nora_chat_system_prompt(
+            user_first_name=current_user.first_name,
+            user_role=current_user.role,
+            user_program_name=program_name,
+            user_level=current_user.level or "l1"
+        )}
         {context}
         """
 
@@ -91,12 +91,11 @@ async def ask_nora(request: ChatRequest):
         return {"answer": response.content}
         
     except Exception as e:
-        print(f"❌ Erreur Nora: {e}")
-        return {"answer": "Je n'arrive pas à fouiller dans mes dossiers pour le moment.",
-                "answer": response.content,
-                "sources": sources
-                
-                }
+        print(f"Erreur détectée : {e}") # Pour que tu puisses voir l'erreur réelle dans tes logs
+        return {
+            "answer": "Je n'arrive pas à fouiller dans mes dossiers pour le moment. Une erreur technique est survenue.",
+            "sources": sources if 'sources' in locals() else []
+        }
 
 @router.post("/chatbot/upload-doc")
 async def upload_document_to_nora(
@@ -151,7 +150,6 @@ async def auto_ingest_project(project_id: int, background_tasks: BackgroundTasks
 
     background_tasks.add_task(full_ingestion_flow)
     return {"message": "Nora commence l'apprentissage du projet."}
-
 
 def process_pdf_logic(file_path: str, metadata: dict):
     """La cuisine interne : PDF -> Texte -> Chunks -> Vecteurs -> ChromaDB."""

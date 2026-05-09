@@ -7,7 +7,8 @@ import subprocess
 import tempfile
 import json
 from database import SessionLocal, Project
-from ai import call_groq_api # Assure-toi que le nom correspond
+from ai import call_groq_api
+from system_prompts import nora_system_prompt_project_analyzer
 
 def parse_github_url(url):
     """
@@ -27,7 +28,6 @@ def process_and_archive_project(project_id: int):
     project = db.query(Project).filter(Project.id == project_id).first()
     
     if not project or not project.github_repository_url:
-        print(f"⚠️ Projet {project_id} non trouvé ou sans URL GitHub.")
         db.close()
         return
 
@@ -71,17 +71,6 @@ def process_and_archive_project(project_id: int):
                 sorted_langs = list(langs.keys())
                 project.primary_language = sorted_langs[0]
                 project.technologies_list = ", ".join(sorted_langs)
-
-        # 4. Analyse IA avec Groq (Score + Résumé)
-        system_prompt = """
-        Tu es Nora, l'IA de la bibliothèque DIT. Analyse le projet étudiant fourni.
-        Tu dois impérativement répondre sous format JSON pur :
-        {
-          "summary": "Ton résumé structuré en Markdown (##, ###, listes, gras)",
-          "score": 85
-        }
-        Le score doit être un entier entre 0 et 100 basé sur la documentation et la clarté.
-        """
         
         user_content = f"""
         Titre: {project.title}
@@ -90,7 +79,7 @@ def process_and_archive_project(project_id: int):
         Technologies: {project.technologies_list}
         """
 
-        ai_response = call_groq_api(system_prompt, user_content)
+        ai_response = call_groq_api(nora_system_prompt_project_analyzer, user_content)
 
         # Parsing de la réponse de Groq
         try:
@@ -102,20 +91,17 @@ def process_and_archive_project(project_id: int):
             project.ai_summary = data.get("summary")
             project.nora_score = float(data.get("score", 0))
         except Exception as e:
-            print(f"⚠️ Erreur parsing JSON Groq: {e}")
             project.ai_summary = ai_response # Fallback sur le texte brut
             project.nora_score = 50.0
 
         # 5. Finalisation
         project.analysis_status = "completed"
         db.commit()
-        print(f"✅ Analyse terminée pour le projet {project.id}")
 
     except Exception as e:
         db.rollback()
         project.analysis_status = "failed"
         db.commit()
-        print(f"❌ Erreur critique Worker : {str(e)}")
 
     finally:
         # 6. Nettoyage du dossier temporaire

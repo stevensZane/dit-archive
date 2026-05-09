@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Github, FileText, Sparkles, Code, User, Calendar, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { 
+  ArrowLeft, Github, FileText, Sparkles, Code, User, 
+  Calendar, ChevronLeft, ChevronRight, Maximize2, Download 
+} from "lucide-react";
 import api from "./api/axios";
 import Navbar from "./Navbar";
 import NoraSummary from "./NoraSummary";
@@ -10,7 +13,9 @@ const ProjectDetail = () => {
   const location = useLocation();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [noraText, setNoraText] = useState("");
+  
+  // État structuré pour l'analyse de Nora
+  const [noraData, setNoraData] = useState({ summary: "", score: null });
   const [loadingNora, setLoadingNora] = useState(true);
 
   // État pour le carrousel
@@ -48,7 +53,28 @@ const ProjectDetail = () => {
     setLoadingNora(true);
     try {
       const res = await api.get(`/projects/${id}/ai-summary`);
-      setNoraText(res.data.summary);
+      
+      let finalSummary = "";
+      let finalScore = null;
+
+      // Logique de parsing : On traite le cas où le summary est une string JSON
+      if (typeof res.data.summary === 'string' && res.data.summary.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(res.data.summary);
+          finalSummary = parsed.summary;
+          finalScore = parsed.score;
+        } catch (e) {
+          finalSummary = res.data.summary;
+        }
+      } else {
+        finalSummary = res.data.summary;
+        finalScore = res.data.score;
+      }
+
+      setNoraData({
+        summary: finalSummary,
+        score: finalScore
+      });
     } catch (err) {
       console.error("Erreur Nora:", err);
     } finally {
@@ -67,6 +93,51 @@ const ProjectDetail = () => {
     setCurrentImgIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
+  // --- LOGIQUE RAPPORTS ---
+  const getReportUrl = (projectId) => {
+    const baseUrl = api.defaults.baseURL.replace(/\/$/, "");
+    return `${baseUrl}/projects/${projectId}/report`;
+  };
+
+  const handleViewReport = (projectId) => {
+    window.open(getReportUrl(projectId), '_blank');
+  };
+
+  // const handleDownloadReport = async (projectId) => {
+  //   try {
+  //     const response = await api.get(`/projects/${projectId}/report`, {
+  //       responseType: 'blob',
+  //     });
+  //     const url = window.URL.createObjectURL(new Blob([response.data]));
+  //     const link = document.createElement('a');
+  //     link.href = url;
+  //     // Nettoyage du nom de fichier
+  //     const fileName = `Rapport_${project.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+  //     link.setAttribute('download', fileName);
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     link.remove();
+  //   } catch (err) {
+  //     console.error("Erreur téléchargement:", err);
+  //   }
+  // };
+
+  const handleDownloadReport = (projectId) => {
+    const baseUrl = api.defaults.baseURL.replace(/\/$/, "");
+    const token = localStorage.getItem('votre_cle_token'); // Récupère ton token
+    
+    // On construit l'URL avec le token en paramètre si ton backend le permet
+    const reportUrl = `${baseUrl}/projects/${projectId}/report?token=${token}`;
+    
+    const link = document.createElement('a');
+    link.href = reportUrl;
+    link.target = "_blank";
+    link.setAttribute('download', `Rapport_${project.title}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const backPath = location.state?.from || "/explore";
   const authorDisplay = project?.is_historical 
     ? project.author_name 
@@ -78,14 +149,6 @@ const ProjectDetail = () => {
       <p className="font-bold animate-pulse">Nora prépare le dossier...</p>
     </div>
   );
-
-  const handleViewReport = (projectId) => {
-    // api.defaults.baseURL contient "http://localhost:8000" ou ton URL de prod
-    const baseUrl = api.defaults.baseURL.replace(/\/$/, ""); // On enlève le slash final s'il existe
-    const reportUrl = `${baseUrl}/projects/${projectId}/report`;
-    
-    window.open(reportUrl, '_blank');
-  };
 
   if (!project) return <div className="text-center mt-20">Projet introuvable.</div>;
 
@@ -99,48 +162,34 @@ const ProjectDetail = () => {
           Retour à la bibliothèque
         </Link>
 
-        {/* --- CARROUSEL DE SCREENSHOTS (Tout en haut) --- */}
+        {/* --- CARROUSEL DE SCREENSHOTS --- */}
         {images.length > 0 && (
           <div className="relative w-full aspect-video md:aspect-[21/9] bg-slate-200 rounded-[2.5rem] overflow-hidden shadow-2xl mb-12 group">
-            {/* Image actuelle */}
             <img 
               src={images[currentImgIndex]} 
               alt={`Screenshot ${currentImgIndex + 1}`}
               className="w-full h-full object-cover transition-opacity duration-500"
             />
 
-            {/* Overlay Gradient (pour que les boutons ressortent) */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
 
-            {/* Boutons de Navigation (Affichés au hover) */}
             {images.length > 1 && (
               <>
-                <button 
-                  onClick={prevSlide}
-                  className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/90 p-3 rounded-2xl text-slate-900 opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-xl"
-                >
+                <button onClick={prevSlide} className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/90 p-3 rounded-2xl text-slate-900 opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-xl">
                   <ChevronLeft size={24} />
                 </button>
-                <button 
-                  onClick={nextSlide}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/90 p-3 rounded-2xl text-slate-900 opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-xl"
-                >
+                <button onClick={nextSlide} className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/90 p-3 rounded-2xl text-slate-900 opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-xl">
                   <ChevronRight size={24} />
                 </button>
 
-                {/* Indicateurs (Dots) */}
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
                   {images.map((_, idx) => (
-                    <div 
-                      key={idx}
-                      className={`h-1.5 transition-all rounded-full ${idx === currentImgIndex ? 'w-8 bg-white' : 'w-2 bg-white/50'}`}
-                    />
+                    <div key={idx} className={`h-1.5 transition-all rounded-full ${idx === currentImgIndex ? 'w-8 bg-white' : 'w-2 bg-white/50'}`} />
                   ))}
                 </div>
               </>
             )}
 
-            {/* Badge Nombre */}
             <div className="absolute top-6 right-6 bg-black/50 backdrop-blur-md text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
               <Maximize2 size={14} /> {currentImgIndex + 1} / {images.length}
             </div>
@@ -153,7 +202,7 @@ const ProjectDetail = () => {
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-6">
-                <span className="bg-[#E91E63]/10 text-[#E91E63] text-xs font-black px-3 py-1 rounded-full uppercase">
+                <span className="bg-[#007A87]/10 text-black text-xs font-black px-3 py-1 rounded-full uppercase">
                   {project.program?.name || project.program_name}
                 </span>
                 {project.is_historical && (
@@ -180,7 +229,7 @@ const ProjectDetail = () => {
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {project.primary_language && (
-                    <span className="bg-[#E91E63] text-white px-4 py-1.5 rounded-xl text-sm font-bold flex items-center gap-2">
+                    <span className="bg-[#004751] text-white px-4 py-1.5 rounded-xl text-sm font-bold">
                       {project.primary_language}
                     </span>
                   )}
@@ -188,7 +237,7 @@ const ProjectDetail = () => {
                     project.technologies_list.split(", ")
                       .filter(lang => lang !== project.primary_language)
                       .map((lang, index) => (
-                        <span key={`lang-${index}`} className="bg-slate-800 text-slate-100 px-4 py-1.5 rounded-xl text-sm font-medium">
+                        <span key={`lang-${index}`} className="bg-[#669099] text-slate-100 px-4 py-1.5 rounded-xl text-sm font-medium">
                           {lang}
                         </span>
                     ))
@@ -197,7 +246,12 @@ const ProjectDetail = () => {
               </div>
             </div>
             
-            <NoraSummary summary={noraText} isLoading={loadingNora} />
+            {/* COMPOSANT NORA PARSÉ */}
+            <NoraSummary 
+              summary={noraData.summary} 
+              score={noraData.score}
+              isLoading={loadingNora} 
+            />
           </div>
 
           {/* COLONNE DROITE */}
@@ -227,19 +281,29 @@ const ProjectDetail = () => {
               
               {project.github_repository_url && (
                   <a href={project.github_repository_url} target="_blank" rel="noreferrer" 
-                    className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-black transition-all">
+                    className="w-full flex items-center justify-center gap-2 bg-[#669099] text-white py-4 rounded-2xl font-bold hover:bg-[#004751] transition-all">
                       <Github size={20} /> Code Source
                   </a>
               )}
 
               {project.report_pdf_url && (
-                <button 
-                  onClick={() => handleViewReport(project.id)} 
-                  className="w-full flex items-center justify-center gap-2 border-2 border-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-50 transition-all"
-                >
-                  <FileText size={20} className="text-[#E91E63]" /> 
-                  Consulter le Rapport
-                </button>
+                <>
+                  <button 
+                    onClick={() => handleViewReport(project.id)} 
+                    className="w-full flex items-center justify-center gap-2 border-2 border-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+                  >
+                    <FileText size={20} className="text-[#E91E63]" /> 
+                    Consulter le Rapport
+                  </button>
+
+                  <button 
+                    onClick={() => handleDownloadReport(project.id)} 
+                    className="w-full flex items-center justify-center gap-2 bg-slate-50 text-slate-600 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all border border-slate-200"
+                  >
+                    <Download size={20} /> 
+                    Télécharger (PDF)
+                  </button>
+                </>
               )}
             </div>
           </div>
