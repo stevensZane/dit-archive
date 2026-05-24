@@ -39,8 +39,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False) # On force 255 pour être large
     avatar_url = Column(String, nullable=True) # URL Cloudinary
     
-    # user_name = Column(String, nullable=False)
-    # last_seen = Column(String, nullable=False)
+    user_name = Column(String, nullable=True)
+    last_seen = Column(String, nullable=True)
     
     
     # --- Champs Analytics pour le Leaderboard ---
