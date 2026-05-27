@@ -72,13 +72,19 @@ function App() {
     window.location.href = "/login?expired=true";
   };
 
-  // ÉCRAN DE CHARGEMENT DISCRET TANT QU'ON SÉCURISE LE SERVEUR
-  if (checkingServer && window.location.pathname !== "/service-down") {
+  // ÉCRAN DE CHARGEMENT : Bloque TOUT le reste tant qu'on n'a pas le verdict du serveur
+  if (checkingServer) {
+    // Si l'utilisateur est déjà sur la page d'erreur, on le laisse voir la page d'erreur
+    if (window.location.pathname === "/service-down") {
+      return <Router><Routes><Route path="/service-down" element={<ServiceDown />} /></Routes></Router>;
+    }
+    
+    // Sinon, on affiche UNIQUEMENT le loader (aucun flash possible !)
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-white gap-3 font-sans">
         <div className="animate-spin text-[#004751] text-2xl">🔄</div>
         <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-          Vérification de l'Archive...
+          Connexion à l'Archive...
         </p>
       </div>
     );
