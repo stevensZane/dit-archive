@@ -1,0 +1,13 @@
+Rendre le score hybride (Data Déterministe + IA)
+
+Au lieu de laisser l'IA décider d'un chiffre magique entre 0 et 100, on va 
+diviser la note sur 100 en trois critères stricts :
+
+    - La richesse technique (30 pts) : Calculée de manière mathématique en fonction 
+      du nombre de langages et frameworks détectés par l'API GitHub.
+
+    - La structure et documentation (30 pts) : Calculée via la taille et la complétude du 
+      README (présence de prérequis, d'instructions d'installation, etc.).
+
+    - L'évaluation métier de Nora (40 pts) : La note purement qualitative donnée par 
+      le LLM (pertinence, innovation, complexité du sujet).

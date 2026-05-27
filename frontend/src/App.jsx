@@ -11,12 +11,14 @@ import ProjectDetail from "./components/pages/ProjectDetail";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import StudentPortal from "./components/pages/StudentSpace";
 import Explore from "./components/pages/Explore";
-import Nora from "./components/Nora/NoraChat";
+import Nora from "./components/pages/NoraChat";
 import AdminSpace from "./components/pages/AdminSpace";
 import { jwtDecode } from "jwt-decode";
 import { useEffect } from "react";
 import Leaderboard from "./components/pages/LeaderBoard";
 import DataPlace from "./components/pages/DataPlace";
+import Feedback from "./components/pages/Feedback";
+import ServiceDown from "./components/pages/ServiceDown"
 
 function App() {
   useEffect(() => {
@@ -49,7 +51,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    window.location.href = "/login?expired=true";
+    window.location.href = "/users/login?expired=true";
   };
 
   return (
@@ -91,8 +93,7 @@ function App() {
           path="/nora"
           element={
             <ProtectedRoute>
-              {" "}
-              <Nora />{" "}
+              <Nora />
             </ProtectedRoute>
           }
         />
@@ -100,8 +101,7 @@ function App() {
           path="/admin-space"
           element={
             <ProtectedRoute>
-              {" "}
-              <AdminSpace />{" "}
+              <AdminSpace />
             </ProtectedRoute>
           }
         />
@@ -109,8 +109,7 @@ function App() {
           path="/leaderboard"
           element={
             <ProtectedRoute>
-              {" "}
-              <Leaderboard />{" "}
+              <Leaderboard />
             </ProtectedRoute>
           }
         />
@@ -118,8 +117,15 @@ function App() {
           path="/data-place"
           element={
             <ProtectedRoute>
-              {" "}
-              <DataPlace />{" "}
+              <DataPlace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/feedback"
+          element={
+            <ProtectedRoute>
+              <Feedback />
             </ProtectedRoute>
           }
         />
@@ -133,6 +139,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/service-down" element={<ServiceDown />} />
 
         {/* Redirections automatiques */}
         <Route path="/" element={<Navigate to="/home" />} />

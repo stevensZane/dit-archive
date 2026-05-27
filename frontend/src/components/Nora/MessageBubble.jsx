@@ -1,10 +1,35 @@
-import React from 'react';
-import { User, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Copy, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import api from '../api/axios';
 import NoraAvatar from './NoraAvatar';
 
-const MessageBubble = ({ msg }) => {
+const MessageBubble = ({ msg, chat_id }) => {
   const isUser = msg.role === 'user';
+  const [feedback, setFeedback] = useState(null); // 'positive', 'negative' ou null
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFeedback = async (type) => {
+  if (feedback === type) return;
+  setFeedback(type);
+
+  try {
+    // 🟢 On envoie true si c'est 'negative' (pouce rouge), false si c'est 'positive' (pouce bleu)
+    await api.post('/chatbot/feedback', {
+      chat_id: chat_id,
+      has_negative_feedback: type === 'negative'
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'envoi du feedback", error);
+  }
+};
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-8 animate-in fade-in slide-in-from-bottom-2`}>
       <div className={`flex gap-4 max-w-[85%] ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -29,16 +54,38 @@ const MessageBubble = ({ msg }) => {
               <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
           </div>
-          {msg.sources?.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2">
-              {msg.sources.map((source, i) => (
-                <a key={i} href={source.url} target="_blank" rel="noreferrer" 
-                   className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-100 rounded-full text-[10px] font-bold text-slate-500 hover:text-[#004751] transition-all">
-                  <ExternalLink size={10} /> {source.title}
-                </a>
-              ))}
+
+          {/* PETITE BARRE D'ACTIONS UNIQUE POUR NORA (Copie + Likes) */}
+          {!isUser && (
+            <div className="flex items-center gap-3 px-3 text-slate-400 text-xs transition-opacity duration-200">
+              <button 
+                onClick={handleCopy}
+                className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+                title="Copier la réponse"
+              >
+                {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                <span>{copied ? 'Copié' : 'Copier'}</span>
+              </button>
+              
+              <span className="text-slate-200">|</span>
+
+              <button 
+                onClick={() => handleFeedback('positive')}
+                className={`hover:text-emerald-600 transition-colors ${feedback === 'positive' ? 'text-emerald-500 font-bold scale-110' : ''}`}
+              >
+                <ThumbsUp size={12} />
+              </button>
+
+              <button 
+                onClick={() => handleFeedback('negative')}
+                className={`hover:text-red-600 transition-colors ${feedback === 'negative' ? 'text-red-500 font-bold scale-110' : ''}`}
+              >
+                <ThumbsDown size={12} />
+              </button>
             </div>
           )}
+          
+          {/* 🔴 Section des sources totalement retirée d'ici */}
         </div>
       </div>
     </div>

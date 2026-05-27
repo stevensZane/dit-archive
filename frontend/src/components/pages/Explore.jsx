@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import Navbar from "../navigations/Navbar";
-import ProjectCard from "../utils/ProjectCard";
+import ProjectCardV from "../project-components/ProjectCard";
 import { Search, Loader2 } from "lucide-react";
 import Footer from "../navigations/Footer";
+import ExploreProjectCard from "../project-components/ExploreProjectCard";
 
 const Explore = () => {
   const [projects, setProjects] = useState([]);
@@ -243,7 +244,7 @@ const Explore = () => {
           ) : filteredProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {filteredProjects.map((project) => (
-                <ProjectCard
+                <ExploreProjectCard
                   key={project.id}
                   project={project}
                   from="/explore"

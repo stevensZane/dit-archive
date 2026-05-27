@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import Navbar from "../navigations/Navbar";
-import ProjectCard from "../utils/ProjectCard"
+import ExploreProjectCard from "../project-components/ExploreProjectCard";
 import { Link } from "react-router-dom";
 import Footer from "../navigations/Footer";
 import HomeFeatures from "../utils/HomeFeatures";
@@ -156,7 +156,7 @@ const Home = () => {
                 ></div>
               ))
             : recentProjects.map((project) => (
-                <ProjectCard key={project.id} project={project} from="/" />
+                <ExploreProjectCard key={project.id} project={project} from="/" />
               ))}
         </div>
       </div>

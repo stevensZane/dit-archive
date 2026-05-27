@@ -23,9 +23,19 @@ const CACHE_KEYS = {
 };
 
 const AdminSpace = () => {
+  // Récupération sécurisée du rôle de l'utilisateur pour le RBAC (Role-Based Access Control)
+  const userString = localStorage.getItem("user");
+  const currentUser = userString ? JSON.parse(userString) : null;
+  const isSuperAdmin = currentUser?.role === "superadmin";
+
   // 1. Initialisation de l'onglet via localStorage (ou 'completed' par défaut)
   const [filter, setFilter] = useState(() => {
-    return localStorage.getItem(CACHE_KEYS.ACTIVE_TAB) || "completed";
+    const savedTab = localStorage.getItem(CACHE_KEYS.ACTIVE_TAB);
+    // Sécurité : si l'onglet mis en cache est restreint et que l'utilisateur n'est pas superadmin, on force le retour à "completed"
+    if ((savedTab === "knowledge" || savedTab === "config") && !isSuperAdmin) {
+      return "completed";
+    }
+    return savedTab || "completed";
   });
 
   const [projects, setProjects] = useState([]);
@@ -102,7 +112,7 @@ const AdminSpace = () => {
               </span>
             </div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-              Archive <span className="text-[#E91E63]">Manager</span>
+              Archive <span className="text-[#004751]">Manager</span>
             </h1>
           </div>
 
@@ -126,18 +136,24 @@ const AdminSpace = () => {
                 label="Échecs"
                 onClick={() => setFilter("error")}
               />
-              <FilterBtn
-                active={filter === "knowledge"}
-                label="Nora"
-                onClick={() => setFilter("knowledge")}
-                color="text-purple-600"
-              />
-              <FilterBtn
-                active={filter === "config"}
-                label="Système"
-                onClick={() => setFilter("config")}
-                color="text-blue-600"
-              />
+              
+              {/* Onglets protégés : Visibles uniquement pour le superadmin */}
+              {isSuperAdmin && (
+                <>
+                  <FilterBtn
+                    active={filter === "knowledge"}
+                    label="Nora"
+                    onClick={() => setFilter("knowledge")}
+                    color="text-purple-600"
+                  />
+                  <FilterBtn
+                    active={filter === "config"}
+                    label="Système"
+                    onClick={() => setFilter("config")}
+                    color="text-blue-600"
+                  />
+                </>
+              )}
             </div>
 
             <button
@@ -150,9 +166,10 @@ const AdminSpace = () => {
         </div>
 
         <div className="min-h-[400px]">
-          {filter === "knowledge" ? (
+          {/* Rendu conditionnel renforcé : si un admin force l'URL ou l'état, rien ne s'affiche */}
+          {filter === "knowledge" && isSuperAdmin ? (
             <NoraBrain />
-          ) : filter === "config" ? (
+          ) : filter === "config" && isSuperAdmin ? (
             <AdminConfig />
           ) : (
             <div className="grid gap-6 animate-in fade-in duration-500">

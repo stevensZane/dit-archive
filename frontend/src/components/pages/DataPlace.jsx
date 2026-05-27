@@ -23,7 +23,7 @@ const DataPlace = () => {
 
         {/* Titre de la page */}
         <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6">
-          The <span className="text-[#004751]">Data Place</span> arrive...
+          Le <span className="text-[#004751]">Data Place</span> arrive...
         </h1>
 
         {/* Nouveau texte qui fusionne tes deux idées */}

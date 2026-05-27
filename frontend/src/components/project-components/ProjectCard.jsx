@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Heart, Code2 } from "lucide-react";
 import api from "../api/axios";
 
-const ProjectCard = ({ project, from }) => {
+const ProjectCardV = ({ project, from }) => {
   const [isLiked, setIsLiked] = useState(project.is_liked_by_me || false);
   const [likesCount, setLikesCount] = useState(project.likes_count || 0);
   const navigate = useNavigate();
@@ -99,4 +99,4 @@ const ProjectCard = ({ project, from }) => {
   );
 };
 
-export default ProjectCard;
+export default ProjectCardV;

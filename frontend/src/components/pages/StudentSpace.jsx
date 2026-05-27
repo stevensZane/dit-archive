@@ -71,7 +71,7 @@ const StudentPortal = () => {
             <h1 className="text-4xl font-black tracking-tight text-slate-900">
               Bonjour,{" "}
               <span className="text-dit-teal">
-                {user?.name || "Étudiant"} !
+                {user?.username || "Étudiant"} !
               </span>
             </h1>
             <p className="text-slate-500 mt-2 font-medium">

@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import api from '../api/axios';
+import TermsModal from '../utils/TermsModal';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
+    username: '', // Ajouté
     first_name: '',
     last_name: '',
     email: '',
     password: '',
-    confirmPassword: '', // Ajouté pour la validation
+    confirmPassword: '',
     academic_year_id: '',
     program_id: '',
     level: ''
   });
 
+  const [showTerms, setShowTerms] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [years, setYears] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +34,9 @@ const Signup = () => {
 
   const isPasswordValid = criteria.every(c => c.test);
   const passwordsMatch = formData.password === formData.confirmPassword && formData.confirmPassword !== '';
+
+  // Validation globale incluant l'acceptation des termes
+  const isFormValid = isPasswordValid && passwordsMatch && hasAcceptedTerms && !loading;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,16 +58,21 @@ const Signup = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!passwordsMatch) return alert("Les mots de passe ne correspondent pas.");
-    
+  // Fonction d'envoi isolée pour s'exécuter aussi après validation de la modal
+  const sendSignupRequest = async () => {
     setLoading(true);
-    // On retire confirmPassword avant l'envoi à l'API
     const { confirmPassword, ...dataToSend } = formData;
+    
+    // Payload formaté pour le backend avec les IDs convertis en nombres et la preuve d'acceptation
+    const payload = {
+      ...dataToSend,
+      academic_year_id: parseInt(dataToSend.academic_year_id, 10),
+      program_id: parseInt(dataToSend.program_id, 10),
+      has_accepted_terms: true
+    };
 
     try {
-      await api.post('/users/signup', dataToSend);
+      await api.post('/users/signup', payload);
       alert("Compte DIT créé ! Connecte-toi.");
       window.location.href = '/login';
     } catch (error) {
@@ -68,6 +80,25 @@ const Signup = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!passwordsMatch) return alert("Les mots de passe ne correspondent pas.");
+
+    if (!hasAcceptedTerms) {
+      setShowTerms(true); // Ouvre la modal si pas encore validé
+      return;
+    }
+    
+    sendSignupRequest();
+  };
+
+  const handleAcceptTermsFromModal = () => {
+    setHasAcceptedTerms(true);
+    setShowTerms(false);
+    // Déclenche l'inscription immédiatement après la validation du modal
+    setTimeout(() => sendSignupRequest(), 100);
   };
 
   return (
@@ -88,26 +119,33 @@ const Signup = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase">Prénom</label>
-              <input name="first_name" type="text" required onChange={handleChange}
+              <input name="first_name" type="text" required value={formData.first_name} onChange={handleChange}
                 className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-dit-teal outline-none" />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase">Nom</label>
-              <input name="last_name" type="text" required onChange={handleChange}
+              <input name="last_name" type="text" required value={formData.last_name} onChange={handleChange}
                 className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-dit-teal outline-none" />
             </div>
           </div>
 
+          {/* CHAMP USERNAME */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase">Nom d'utilisateur</label>
+            <input name="username" type="text" required value={formData.username} onChange={handleChange} placeholder="ex: diallo_dev"
+              className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-dit-teal outline-none" />
+          </div>
+
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Email Institutionnel (@dit.sn)</label>
-            <input name="email" type="email" required onChange={handleChange} placeholder="nom.prenom@dit.sn"
+            <input name="email" type="email" required value={formData.email} onChange={handleChange} placeholder="nom.prenom@dit.sn"
               className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-dit-teal outline-none" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase">Filière</label>
-              <select name="program_id" required onChange={handleChange}
+              <select name="program_id" required value={formData.program_id} onChange={handleChange}
                 className="mt-1 w-full px-4 py-2 border rounded-lg bg-white outline-none">
                 <option value="">Choisir...</option>
                 {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -115,7 +153,7 @@ const Signup = () => {
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase">Niveau</label>
-              <select name="level" required onChange={handleChange}
+              <select name="level" required value={formData.level} onChange={handleChange}
                 className="mt-1 w-full px-4 py-2 border rounded-lg bg-white outline-none">
                 <option value="">Choisir...</option>
                 <option value="L1">Licence 1</option>
@@ -129,7 +167,7 @@ const Signup = () => {
 
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Promotion (Année)</label>
-            <select name="academic_year_id" required onChange={handleChange}
+            <select name="academic_year_id" required value={formData.academic_year_id} onChange={handleChange}
               className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-dit-teal outline-none appearance-none">
               <option value="">Sélectionner l'année...</option>
               {years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
@@ -140,7 +178,7 @@ const Signup = () => {
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Mot de passe</label>
             <div className="relative">
-              <input name="password" type={showPassword ? "text" : "password"} required onChange={handleChange}
+              <input name="password" type={showPassword ? "text" : "password"} required value={formData.password} onChange={handleChange}
                 className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-dit-teal outline-none" />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-gray-400">
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -152,7 +190,7 @@ const Signup = () => {
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">Confirmer le mot de passe</label>
             <div className="relative">
-              <input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} required onChange={handleChange}
+              <input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} required value={formData.confirmPassword} onChange={handleChange}
                 className={`mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none ${formData.confirmPassword && !passwordsMatch ? 'border-red-500 focus:ring-red-200' : 'focus:ring-dit-teal'}`} />
               <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-gray-400">
                 {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -171,11 +209,31 @@ const Signup = () => {
             ))}
           </div>
 
+          {/* CHECKBOX DES CONDITIONS */}
+          <div className="pt-2 pl-1 flex items-start gap-2">
+            <input 
+              type="checkbox" 
+              id="accept_terms"
+              checked={hasAcceptedTerms}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setShowTerms(true);
+                } else {
+                  setHasAcceptedTerms(false);
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-dit-teal focus:ring-dit-teal"
+            />
+            <label htmlFor="accept_terms" className="text-xs text-gray-500 cursor-pointer select-none">
+              J'accepte les conditions d'utilisation et le traitement confidentiel de mes prompts par Nora. <span className="text-dit-teal font-bold underline">Lire les termes</span>
+            </label>
+          </div>
+
           <button 
             type="submit" 
-            disabled={!isPasswordValid || !passwordsMatch || loading}
+            disabled={!isFormValid}
             className={`w-full font-black py-4 rounded-2xl shadow-lg transition-all transform active:scale-95 text-[10px] uppercase tracking-[0.2em]
-              ${isPasswordValid && passwordsMatch && !loading
+              ${isFormValid
                 ? 'bg-[#004751] hover:bg-slate-900 text-white shadow-teal-100 cursor-pointer' 
                 : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
               }`}
@@ -195,6 +253,12 @@ const Signup = () => {
           Déjà inscrit ? <a href="/login" className="text-dit-teal font-bold hover:underline">Se connecter</a>
         </p>
       </div>
+
+      <TermsModal 
+        isOpen={showTerms} 
+        onClose={() => setShowTerms(false)} 
+        onAccept={handleAcceptTermsFromModal} 
+      />
     </div>
   );
 };

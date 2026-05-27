@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import api from '../api/axios';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react'; // Import des icônes
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  // Changement de nom de variable pour refléter le choix (email ou username)
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // État pour la visibilité
+  const [showPassword, setShowPassword] = useState(false);
   const [searchParams] = useSearchParams();
   const isExpired = searchParams.get('expired') === 'true';
 
@@ -14,10 +15,10 @@ const Login = () => {
     e.preventDefault();
     try {
       const params = new URLSearchParams();
-      params.append('username', email.trim());
+      params.append('username', identifier.trim()); // Envoyé dans la clé 'username' pour OAuth2
       params.append('password', password);
 
-      const response = await api.post('/login', params, {
+      const response = await api.post('/users/login', params, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
@@ -27,7 +28,7 @@ const Login = () => {
       localStorage.setItem('token', response.data.access_token);
       localStorage.setItem("user", JSON.stringify(response.data.user));
 
-      if (user.role === "admin") {
+      if (user.role === "admin" || user.role === "superadmin") {
         window.location.href = '/admin-space';
       } else {
         window.location.href = '/home';
@@ -35,6 +36,20 @@ const Login = () => {
     } catch (error) {
       console.error(error.response?.data);
       alert("Erreur de connexion. Vérifie tes identifiants.");
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      const response = await api.post('/users/guest-login');
+      
+      localStorage.setItem('token', response.data.access_token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+
+      // Redirection directe vers le catalogue de l'application
+      window.location.href = '/home';
+    } catch (error) {
+      alert("Impossible d'accéder au mode invité pour le moment.");
     }
   };
 
@@ -60,13 +75,14 @@ const Login = () => {
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Adresse mail</label>
+            {/* Label et type mis à jour pour accepter email ou pseudo */}
+            <label className="block text-sm font-medium text-gray-700">Identifiant ou Adresse mail</label>
             <input 
-              type="email" 
+              type="text" 
               className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-dit-teal focus:border-dit-teal outline-none"
-              placeholder="votre.nom@dit.sn"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="nom.prenom@dit.sn ou nom_utilisateur"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
             />
           </div>
@@ -101,6 +117,21 @@ const Login = () => {
           <p className="text-center text-sm text-gray-600">
             Vous n'avez pas encore de compte ? <a href="/signup" className="text-dit-teal font-bold hover:underline">Créer un compte</a>
           </p>
+
+          {/* ... après ton bouton submit principal ... */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink mx-4 text-gray-400 text-xs uppercase tracking-wider">Ou</span>
+            <div className="flex-grow border-t border-gray-200"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGuestLogin}
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-lg transition duration-300 transform active:scale-95 border border-slate-200 text-sm"
+          >
+            Explorer en tant qu'invité
+          </button>
         </form>
       </div>
     </div>
