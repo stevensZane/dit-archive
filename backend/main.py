@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,9 @@ from routers import admin, projects, nora, util_endpoints, auth_and_users
 from listeners import listeners
 from seeds.seed_admin_users import seed_admin_users 
 from seeds.seed_metadata import seed_metadata
+from dotenv import load_dotenv
+
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,7 +21,7 @@ async def lifespan(app: FastAPI):
     seed_admin_users()
     
     # 3. Injeter, les filières, les années et chai plus quoi d'autre
-    #seed_metadata()
+    seed_metadata()
     
     yield
 
@@ -41,4 +45,5 @@ app.include_router(auth_and_users.router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
