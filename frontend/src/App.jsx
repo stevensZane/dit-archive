@@ -4,6 +4,11 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
+import api from "./components/api/axios";
+
+// Vos composants
 import Login from "./components/auth/Login";
 import Signup from "./components/auth/Signup";
 import Home from "./components/pages/Home";
@@ -13,15 +18,28 @@ import StudentPortal from "./components/pages/StudentSpace";
 import Explore from "./components/pages/Explore";
 import Nora from "./components/pages/NoraChat";
 import AdminSpace from "./components/pages/AdminSpace";
-import { jwtDecode } from "jwt-decode";
-import { useEffect } from "react";
 import Leaderboard from "./components/pages/LeaderBoard";
 import DataPlace from "./components/pages/DataPlace";
 import Feedback from "./components/pages/Feedback";
-import ServiceDown from "./components/pages/ServiceDown"
+import ServiceDown from "./components/pages/ServiceDown";
 
 function App() {
+  const [checkingServer, setCheckingServer] = useState(true);
+  
   useEffect(() => {
+    // 1. TEST DE CONNEXION AU BACKEND AU DÉMARRAGE
+    api.get("/")
+      .catch((err) => {
+        // Si le serveur ne répond pas, l'intercepteur axios gère déjà le window.location.href = "/service-down"
+        if (!err.response) {
+          console.error("Serveur éteint détecté au démarrage.");
+        }
+      })
+      .finally(() => {
+        setCheckingServer(false);
+      });
+
+    // 2. GESTION DE TOKEN
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -51,8 +69,20 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    window.location.href = "/users/login?expired=true";
+    window.location.href = "/login?expired=true";
   };
+
+  // ÉCRAN DE CHARGEMENT DISCRET TANT QU'ON SÉCURISE LE SERVEUR
+  if (checkingServer && window.location.pathname !== "/service-down") {
+    return (
+      <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-white gap-3 font-sans">
+        <div className="animate-spin text-[#004751] text-2xl">🔄</div>
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          Vérification de l'Archive...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <Router>
