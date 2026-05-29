@@ -27,6 +27,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DIT Archive API", lifespan=lifespan)
 
+@app.get("/")
+def health_check():
+    return {"status": "healthy", "message": "L'Archive DIT est en ligne !"}
+
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
