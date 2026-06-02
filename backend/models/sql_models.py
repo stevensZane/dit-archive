@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, Text, Table, Float
 from sqlalchemy.orm import relationship
 from config.database import Base
+from pgvector.sqlalchemy import Vector
 
 # Table de liaison Many-to-Many pour les technologies
 project_technologies = Table(
@@ -213,3 +214,13 @@ class ProjectInteraction(Base):
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"))
     interaction_type = Column(String(20))  # 'view' ou 'download'
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class SchoolVector(Base):
+    __tablename__ = "school_vectors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    url = Column(String, nullable=True) # Si ça vient du site web
+    content = Column(Text, nullable=False) # Le texte brut du morceau (chunk)
+    
+    # Le vecteur généré par Nomic (Nomic embed v1.5 fait 768 dimensions)
+    embedding = Column(Vector(768))
