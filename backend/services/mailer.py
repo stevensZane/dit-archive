@@ -1,5 +1,6 @@
 import os
 import smtplib
+import socket  # 🟢 Import indispensable pour forcer l'IPv4 sur Railway
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -7,9 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def send_custom_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Fonction d'envoi d'e-mail universelle, blindée avec gestion de timeout et de port."""
+    """Fonction d'envoi d'e-mail universelle, blindée avec gestion de timeout, de port et d'IPv4."""
     smtp_host = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-    # On récupère le port depuis le .env, par défaut 587
     smtp_port = int(os.getenv("EMAIL_PORT", 587))
     smtp_user = os.getenv("EMAIL_ADDRESS")
     smtp_password = os.getenv("EMAIL_PASSWORD")
@@ -24,18 +24,34 @@ def send_custom_email(to_email: str, subject: str, html_content: str) -> bool:
     msg["Subject"] = subject
     msg.attach(MIMEText(html_content, "html"))
 
+    # 🟢 PATCH RAILWAY : Force la résolution DNS en IPv4 pour éviter le crash "Network is unreachable"
+    try:
+        addresses = socket.getaddrinfo(smtp_host, smtp_port, socket.AF_INET, socket.SOCK_STREAM)
+        if addresses:
+            # On extrait l'IP IPv4 résolue pour la connexion, mais on garde le host initial pour le certificat SSL
+            target_ip = addresses[0][4][0]
+            print(f"🌐 [Email System] Host {smtp_host} résolu en IPv4 : {target_ip}")
+        else:
+            target_ip = smtp_host
+    except Exception as dns_err:
+        print(f"⚠️ [Email System] Échec de la résolution IPv4 forcée: {dns_err}")
+        target_ip = smtp_host
+
     try:
         print(f"📧 [Email System] Envoi à {to_email} via {smtp_host}:{smtp_port}...")
         
         # Si le port est 465 (SSL direct)
         if smtp_port == 465:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+            with smtplib.SMTP_SSL(target_ip, smtp_port, timeout=10) as server:
+                server.ehlo(smtp_host)
                 server.login(smtp_user, smtp_password)
                 server.sendmail(smtp_user, to_email, msg.as_string())
-        # Si le port est 587 (TLS - Ton cas sur Railway)
+        # Si le port est 587 (TLS - Ton cas par défaut)
         else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            with smtplib.SMTP(target_ip, smtp_port, timeout=10) as server:
+                server.ehlo()
                 server.starttls()  # Sécurisation TLS obligatoire pour le 587
+                server.ehlo()
                 server.login(smtp_user, smtp_password)
                 server.sendmail(smtp_user, to_email, msg.as_string())
                 
@@ -47,11 +63,11 @@ def send_custom_email(to_email: str, subject: str, html_content: str) -> bool:
         print(f"❌ [Email System] CRASH ENVOI MAIL : {str(e)}")
     return False
 
+
 def send_welcome_email(to_email: str, first_name: str):
-    """Réutilise la fonction robuste pour l'inscription."""
+    """Réutilise la fonction robuste pour l'inscription des nouveaux étudiants."""
     subject = "Bienvenue sur DIT Archive ! 🚀"
     
-    # Correction de ta balise HTML (rounded-3xl n'est pas du style inline CSS valide, border-radius oui)
     html_content = f"""
     <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0; border-radius: 24px;">
         <h2 style="color: #004751;">Salut {first_name} ! 👋</h2>
@@ -65,11 +81,11 @@ def send_welcome_email(to_email: str, first_name: str):
         <p style="font-size: 11px; color: #666; text-align: center;">Ceci est un message automatique de ton portail Dakar Institute of Technology.</p>
     </div>
     """
-    # Remplacement du lien localhost par ton futur domaine ou une URL relative pour la prod !
     return send_custom_email(to_email, subject, html_content)
 
+
 def broadcast_email_task(student_emails: list, subject: str, message_body: str):
-    """Tâche de fond pour envoyer les e-mails un par un sans surcharger le serveur."""
+    """Tâche de fond pour envoyer les e-mails de diffusion générale un par un."""
     print(f"📣 [Broadcast] Début de la diffusion pour {len(student_emails)} étudiants.")
     
     for email in student_emails:
