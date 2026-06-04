@@ -85,10 +85,10 @@ const Home = () => {
           Technology.
         </p>
 
-        {/* Barre de Recherche */}
+        {/* Barre de Recherche (z-index corrigé à 10 pour passer SOUS la Navbar) */}
         <div
           className="relative max-w-3xl mx-auto mb-12"
-          style={{ zIndex: 100 }}
+          style={{ zIndex: 10 }}
         >
           <input
             type="text"
@@ -98,9 +98,9 @@ const Home = () => {
             placeholder="Rechercher un projet..."
           />
 
-          {/* Résultats de recherche en overlay */}
+          {/* Résultats de recherche en overlay (z-index corrigé à 20) */}
           {isSearching && searchQuery.length >= 2 && (
-            <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-[400px] overflow-y-auto z-[110]">
+            <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-[400px] overflow-y-auto z-[20]">
               {searchResults && searchResults.length > 0 ? (
                 searchResults.map((p) => (
                   <Link
@@ -132,7 +132,7 @@ const Home = () => {
       </div>
       <HomeFeatures />
 
-      {/* Ajouter un petit résumé du Leaderboard ici, les quatre ou cinq best */}
+      {/* Ajouter un petit résumé du Leaderboard ici, les quatre ou fins best */}
 
       {/* Section Projets Récents */}
       <div className="max-w-7xl mx-auto px-6 pb-20">

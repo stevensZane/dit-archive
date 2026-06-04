@@ -16,19 +16,18 @@ const MessageBubble = ({ msg, chat_id }) => {
   };
 
   const handleFeedback = async (type) => {
-  if (feedback === type) return;
-  setFeedback(type);
+    if (feedback === type) return;
+    setFeedback(type);
 
-  try {
-    // 🟢 On envoie true si c'est 'negative' (pouce rouge), false si c'est 'positive' (pouce bleu)
-    await api.post('/chatbot/feedback', {
-      chat_id: chat_id,
-      has_negative_feedback: type === 'negative'
-    });
-  } catch (error) {
-    console.error("Erreur lors de l'envoi du feedback", error);
-  }
-};
+    try {
+      await api.post('/chatbot/feedback', {
+        chat_id: chat_id,
+        has_negative_feedback: type === 'negative'
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du feedback", error);
+    }
+  };
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-8 animate-in fade-in slide-in-from-bottom-2`}>
@@ -39,18 +38,34 @@ const MessageBubble = ({ msg, chat_id }) => {
           {isUser ? <User size={18} /> : <NoraAvatar size="sm" />}
         </div>
         <div className="space-y-2">
-          <div className={`px-5 py-3.5 rounded-[1.5rem] text-[15px] leading-relaxed shadow-sm border ${
+          <div className={`px-5 py-4 rounded-[1.5rem] text-[15px] leading-relaxed shadow-sm border ${
             isUser 
               ? 'bg-[#004751] text-white border-transparent rounded-tr-none' 
               : 'bg-white text-slate-700 border-slate-100 rounded-tl-none'
           }`}>
             {msg.fileName && (
-              <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : 'prose-slate'} 
-              prose-ul:list-disc prose-ul:ml-4 prose-li:my-0 mb-2`}>
+              <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : 'prose-slate'} mb-3`}>
                 <ReactMarkdown>{`📄 **Fichier joint :** ${msg.fileName}`}</ReactMarkdown>
               </div>
             )}
-            <div className={`prose prose-sm max-w-none prose-li:list-disc ${isUser ? 'prose-invert' : 'prose-slate'}`}>
+            
+            {/* 🎨 ZONE DE RENDU EXTÉRIEURE INTÉGRANT LES CLASSES SUR-MESURE */}
+            <div className={`prose max-w-none 
+              ${isUser ? 'prose-invert text-white' : 'prose-slate text-slate-700'}
+              
+              /* Style des Titres (H3) */
+              prose-h3:text-base prose-h3:font-black prose-h3:text-[#004751] prose-h3:mt-4 prose-h3:mb-2 prose-h3:flex prose-h3:items-center prose-h3:gap-2
+              
+              /* Forçage et aération des listes à puces */
+              prose-ul:list-disc prose-ul:pl-5 prose-ul:my-2 prose-ul:space-y-2
+              prose-li:my-0 prose-li:leading-relaxed
+              
+              /* Mise en valeur colorée des éléments en **Gras** chez Nora */
+              ${!isUser ? 'prose-strong:text-[#004751] prose-strong:font-extrabold prose-strong:bg-[#004751]/5 prose-strong:px-1.5 prose-strong:py-0.5 prose-strong:rounded-md' : 'prose-strong:text-white prose-strong:font-bold'}
+              
+              /* Paragraphes fluides */
+              prose-p:mb-3 prose-p:leading-relaxed
+            `}>
               <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
           </div>
@@ -84,8 +99,6 @@ const MessageBubble = ({ msg, chat_id }) => {
               </button>
             </div>
           )}
-          
-          {/* 🔴 Section des sources totalement retirée d'ici */}
         </div>
       </div>
     </div>

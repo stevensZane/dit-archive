@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ShieldCheck,
-  RefreshCw,
   Archive,
   Users,
   BrainCircuit,
   PlusCircle,
+  MoreVertical,
+  MessageSquare,
+  Megaphone,
+  RefreshCw,
 } from "lucide-react";
 import api from "../api/axios";
 import Navbar from "../navigations/Navbar";
@@ -15,7 +18,10 @@ import ProjectItem from "../admin/ProjectItem";
 import AdminConfig from "../admin/AdminConfig";
 import HistoricalUploadModal from "../admin/HistoricalUploadModal";
 
-// Constantes pour le cache
+// Nouveaux composants d'administration
+import AdminFeedbacksModal from "../admin/AdminFeedbacksModal";
+import AdminBroadcastModal from "../admin/AdminBroadcastModal";
+
 const CACHE_KEYS = {
   PROJECTS: "dit_admin_projects_cache",
   STATS: "dit_admin_stats_cache",
@@ -23,15 +29,12 @@ const CACHE_KEYS = {
 };
 
 const AdminSpace = () => {
-  // Récupération sécurisée du rôle de l'utilisateur pour le RBAC (Role-Based Access Control)
   const userString = localStorage.getItem("user");
   const currentUser = userString ? JSON.parse(userString) : null;
   const isSuperAdmin = currentUser?.role === "superadmin";
 
-  // 1. Initialisation de l'onglet via localStorage (ou 'completed' par défaut)
   const [filter, setFilter] = useState(() => {
     const savedTab = localStorage.getItem(CACHE_KEYS.ACTIVE_TAB);
-    // Sécurité : si l'onglet mis en cache est restreint et que l'utilisateur n'est pas superadmin, on force le retour à "completed"
     if ((savedTab === "knowledge" || savedTab === "config") && !isSuperAdmin) {
       return "completed";
     }
@@ -42,11 +45,29 @@ const AdminSpace = () => {
   const [stats, setStats] = useState({ total_projects: 0, students: 0 });
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // États pour les nouvelles fonctionnalités de feedbacks, broadcast et maintenance
+  const [isFeedbacksOpen, setIsFeedbacksOpen] = useState(false);
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isSyncingScores, setIsSyncingScores] = useState(false);
+  
+  const menuRef = useRef(null);
 
-  // Sauvegarder l'onglet dès qu'il change
   useEffect(() => {
     localStorage.setItem(CACHE_KEYS.ACTIVE_TAB, filter);
   }, [filter]);
+
+  // Fermer le menu contextuel si on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -55,11 +76,8 @@ const AdminSpace = () => {
         api.get("/admin/projects"),
         api.get("/admin/stats"),
       ]);
-
       setProjects(projRes.data);
       setStats(statsRes.data);
-
-      // Mise à jour du cache
       localStorage.setItem(CACHE_KEYS.PROJECTS, JSON.stringify(projRes.data));
       localStorage.setItem(CACHE_KEYS.STATS, JSON.stringify(statsRes.data));
     } catch (err) {
@@ -70,16 +88,31 @@ const AdminSpace = () => {
   };
 
   useEffect(() => {
-    // 2. Charger le cache immédiatement au montage
     const cachedProj = localStorage.getItem(CACHE_KEYS.PROJECTS);
     const cachedStats = localStorage.getItem(CACHE_KEYS.STATS);
-
     if (cachedProj) setProjects(JSON.parse(cachedProj));
     if (cachedStats) setStats(JSON.parse(cachedStats));
-
-    // 3. Rafraîchir les données en arrière-plan
     fetchData(true);
   }, []);
+
+  // Fonction de secours pour recalculer les scores
+  const handleRefreshScores = async () => {
+    setMenuOpen(false);
+    if (!window.confirm("Forcer le recalcul global des métadonnées et scores Nora de tous les projets ?")) return;
+    
+    setIsSyncingScores(true);
+    try {
+      // Ton endpoint de recalcul global
+      await api.post("/admin/sync-old-points");
+      alert("Recalcul global terminé avec succès !");
+      fetchData(true);
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors du recalcul des scores.");
+    } finally {
+      setIsSyncingScores(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFDFD] pb-20">
@@ -99,7 +132,7 @@ const AdminSpace = () => {
           <StatCard
             icon={<BrainCircuit className="text-purple-500" />}
             label="Index Nora"
-            value="Actif"
+            value={isSyncingScores ? "Recalcul..." : "Actif"}
           />
         </div>
 
@@ -136,8 +169,6 @@ const AdminSpace = () => {
                 label="Échecs"
                 onClick={() => setFilter("error")}
               />
-              
-              {/* Onglets protégés : Visibles uniquement pour le superadmin */}
               {isSuperAdmin && (
                 <>
                   <FilterBtn
@@ -156,43 +187,96 @@ const AdminSpace = () => {
               )}
             </div>
 
-            <button
-              onClick={() => fetchData()}
-              className="p-3.5 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all text-slate-400"
-            >
-              <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-            </button>
+            {/* BOUTON DES TROIS POINTS (Remplacement du refresh) */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className={`p-3.5 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all text-slate-600 ${menuOpen ? "ring-2 ring-[#004751]" : ""}`}
+              >
+                {isSyncingScores || loading ? (
+                  <RefreshCw size={18} className="animate-spin text-[#004751]" />
+                ) : (
+                  <MoreVertical size={18} />
+                )}
+              </button>
+
+              {/* Menu Contextuel Déroulant */}
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-3 duration-200">
+                  <button
+                    onClick={() => { setMenuOpen(false); setIsFeedbacksOpen(true); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-700 hover:bg-slate-50 transition-all text-left"
+                  >
+                    <MessageSquare size={16} className="text-[#004751]" />
+                    <span>Feedbacks Étudiants</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setMenuOpen(false); setIsBroadcastOpen(true); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-700 hover:bg-slate-50 transition-all text-left"
+                  >
+                    <Megaphone size={16} className="text-pink-600" />
+                    <span>Broadcast E-mails</span>
+                  </button>
+
+                  <hr className="border-slate-100 my-1" />
+
+                  <button
+                    onClick={handleRefreshScores}
+                    disabled={isSyncingScores}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-orange-600 hover:bg-orange-50 transition-all text-left disabled:opacity-50"
+                  >
+                    <RefreshCw size={16} className={isSyncingScores ? "animate-spin" : ""} />
+                    <span>Forcer les scores</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="min-h-[400px]">
-          {/* Rendu conditionnel renforcé : si un admin force l'URL ou l'état, rien ne s'affiche */}
           {filter === "knowledge" && isSuperAdmin ? (
             <NoraBrain />
           ) : filter === "config" && isSuperAdmin ? (
             <AdminConfig />
           ) : (
             <div className="grid gap-6 animate-in fade-in duration-500">
-              {projects.filter((p) => p.analysis_status === filter).length >
-              0 ? (
-                projects
-                  .filter((p) => p.analysis_status === filter)
-                  .map((project) => (
+              {(() => {
+                // Normalisation et filtrage intelligent
+                const filteredProjects = projects.filter((p) => {
+                  const status = p.analysis_status?.toLowerCase();
+                  
+                  if (filter === "completed") {
+                    return status === "completed" || status === "success";
+                  }
+                  if (filter === "error") {
+                    // Gère si ton back renvoie "error", "failed" ou "failed_analysis" en majuscules ou minuscules
+                    return status === "error" || status === "failed" || status?.includes("fail");
+                  }
+                  return status === filter;
+                });
+
+                if (filteredProjects.length > 0) {
+                  return filteredProjects.map((project) => (
                     <ProjectItem
                       key={project.id}
                       project={project}
                       refresh={fetchData}
                     />
-                  ))
-              ) : (
-                <div className="text-center py-20 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-100">
-                  <p className="text-slate-400 font-medium italic text-sm">
-                    {loading
-                      ? "Mise à jour de la base..."
-                      : "Aucun projet dans cette catégorie"}
-                  </p>
-                </div>
-              )}
+                  ));
+                }
+
+                return (
+                  <div className="text-center py-20 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-100">
+                    <p className="text-slate-400 font-medium italic text-sm">
+                      {loading
+                        ? "Mise à jour de la base..."
+                        : `Aucun projet dans la catégorie "${filter === "error" ? "Échecs" : "Projets"}"`}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -203,11 +287,14 @@ const AdminSpace = () => {
         onClose={() => setIsModalOpen(false)}
         refreshData={fetchData}
       />
+
+      {/* NOUVEAUX MODALS INJECTÉS EN BAS POUR GARDER LE CODE CLEAN */}
+      <AdminFeedbacksModal isOpen={isFeedbacksOpen} onClose={() => setIsFeedbacksOpen(false)} />
+      <AdminBroadcastModal isOpen={isBroadcastOpen} onClose={() => setIsBroadcastOpen(false)} />
     </div>
   );
 };
 
-// Composant Bouton de filtre exporté localement pour la propreté
 const FilterBtn = ({ active, label, onClick, color = "text-slate-900" }) => (
   <button
     onClick={onClick}

@@ -1,16 +1,17 @@
 import os
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from github import Github
 from config.database import get_db
 from utils.auth_utils import get_current_user, require_role, hash_password
 from services.services import process_and_archive_project
-from models.sql_models import User, Project, AcademicYear, Program, Like
+from models.sql_models import User, Project, AcademicYear, Program, Like, Feedback
 from models.pydantic_models import AdminCreate
 from utils.cloudinary_utils import upload_to_cloudinary
 from datetime import timedelta, datetime
 from typing import Optional
+from services.mailer import send_custom_email, broadcast_email_task
 
 # Config GitHub
 g = Github(os.getenv("GITHUB_TOKEN"))
@@ -156,7 +157,6 @@ def admin_create_user(
     db.commit()
     return {"message": f"Utilisateur avec le rôle {user_in.role} créé avec succès"}
 
-
 @router.delete("/admin/projects/{project_id}")
 def delete_project(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -227,7 +227,6 @@ def get_online_users(
         "online_users": online_users_list
     }
 
-
 @router.post("/admin/sync-old-points")
 def sync_old_points(db: Session = Depends(get_db)):
     # 1. On récupère tous les utilisateurs
@@ -268,3 +267,114 @@ def sync_old_points(db: Session = Depends(get_db)):
 
     db.commit()
     return {"message": "Toutes les anciennes données ont été synchronisées avec succès !"}
+
+@router.get("/admin/feedbacks")
+def get_all_feedbacks(
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    """Récupère la liste de tous les feedbacks triés du plus récent au plus ancien."""
+    # Sécurité optionnelle : Vérifier si l'utilisateur est bien ADMIN ou SUPERADMIN
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Accès réservé à l'administration du DIT.")
+
+    feedbacks = db.query(Feedback).order_by(Feedback.created_at.desc()).all()
+    
+    # Formatage propre pour ton front React/Vercel
+    return [
+        {
+            "id": f.id,
+            "type": f.type,
+            "message": f.message,
+            "is_resolved": f.is_resolved,
+            "admin_notes": f.admin_notes,
+            "created_at": f.created_at,
+            "user": {
+                "id": f.user.id,
+                "full_name": f"{f.user.first_name} {f.user.last_name}",
+                "email": f.user.email,
+                "role": f.user.role
+            } if f.user else {"full_name": "Utilisateur Invité (Guest)", "email": None}
+        }
+        for f in feedbacks
+    ]
+
+@router.post("/admin/feedbacks/{feedback_id}/resolve")
+def resolve_feedback(
+    feedback_id: int,
+    admin_notes: str = Body(embed=True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Marque un feedback comme résolu, sauvegarde les notes et envoie un e-mail à l'étudiant."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Action non autorisée.")
+
+    # 1. Recherche du feedback
+    feedback = db.query(Feedback).filter(Feedback.id == feedback_id).first()
+    if not feedback:
+        raise HTTPException(status_code=404, detail="Feedback introuvable.")
+
+    # 2. Mise à jour du statut dans Neon
+    feedback.is_resolved = True
+    feedback.admin_notes = admin_notes
+    db.commit()
+
+    # 3. Envoi de l'e-mail de notification si le feedback est lié à un étudiant inscrit
+    if feedback.user and feedback.user.email:
+        subject = "🌟 [DIT Archive] Votre retour a été traité !"
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <h2 style="color: #2c3e50;">Bonjour {feedback.user.first_name},</h2>
+                    <p>Merci d'avoir contribué à l'amélioration de la plateforme <strong>DIT Archive</strong>.</p>
+                    <p>L'équipe pédagogique et technique a traité votre retour de type <span style="background: #f1f2f6; padding: 2px 6px; border-radius: 4px; font-weight: bold;">{feedback.type}</span> :</p>
+                    
+                    <blockquote style="background-color: #f9f9f9; border-left: 4px solid #3498db; margin: 15px 0; padding: 10px 20px; font-style: italic;">
+                        "{feedback.message}"
+                    </blockquote>
+
+                    <p><strong>Message de l'administrateur :</strong><br>{admin_notes}</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="font-size: 0.9em; color: #7f8c8d;">Ceci est un e-mail automatique de Nora, l'assistant virtuel du Dakar Institute of Technology.</p>
+                </div>
+            </body>
+        </html>
+        """
+        # Exécution de l'envoi (on peut la lancer via BackgroundTasks pour fluidifier le front)
+        send_custom_email(to_email=feedback.user.email, subject=subject, html_content=html_content)
+
+    return {"status": "success", "message": "Feedback clôturé et e-mail de notification envoyé."}
+
+@router.post("/admin/broadcast")
+async def send_broadcast_email(
+    background_tasks: BackgroundTasks,
+    subject: str = Body(..., embed=True),
+    message: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Route Admin pour envoyer un e-mail généralisé à TOUS les comptes étudiants enregistrés."""
+    # 1. Vérification stricte des droits d'accès
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Action réservée à l'administration du DIT.")
+
+    # 2. Récupération de tous les e-mails des utilisateurs ayant le rôle étudiant
+    # On exclut les invités ou les autres admins pour cibler la masse
+    students = db.query(User.email).filter(User.role == "student", User.email.isnot(None)).all()
+    
+    # Extraction de la liste des e-mails (les tuples SQLAlchemy -> list de chaînes)
+    student_emails = [s.email for s in students]
+
+    if not student_emails:
+        return {"status": "ignored", "message": "Aucun e-mail étudiant trouvé dans la base de données."}
+
+    # 3. Lancement de la diffusion en arrière-plan
+    background_tasks.add_task(broadcast_email_task, student_emails, subject, message)
+
+    return {
+        "status": "success", 
+        "message": f"La diffusion a été confiée à Nora en tâche de fond. {len(student_emails)} e-mails sont en cours d'envoi."
+    }

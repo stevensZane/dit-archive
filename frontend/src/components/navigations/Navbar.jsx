@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react"; // Ajout de useRef
 import { useNavigate, Link } from "react-router-dom";
 import { LogOut, Menu, X } from "lucide-react";
 import NoraAvatar from "../Nora/NoraAvatar";
@@ -6,6 +6,37 @@ import NoraAvatar from "../Nora/NoraAvatar";
 const Navbar = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false); 
+  
+  // On stocke la position du scroll au moment de l'ouverture
+  const scrollStartRef = useRef(0);
+
+  // On capture le scroll de départ quand le menu s'ouvre
+  useEffect(() => {
+    if (isOpen) {
+      scrollStartRef.current = window.scrollY;
+    }
+  }, [isOpen]);
+
+  // Détection du scroll avec seuil de tolérance pour éviter les micro-mouvements tactiles
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!isOpen) return;
+
+      const currentScroll = window.scrollY;
+      const totalScrolled = Math.abs(currentScroll - scrollStartRef.current);
+
+      // Seuil de 15 pixels : Évite que le menu se ferme tout seul au moindre toucher de doigt
+      if (totalScrolled > 15) {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [isOpen]);
 
   const storedUser = localStorage.getItem("user");
   let user = null;
@@ -52,8 +83,13 @@ const Navbar = () => {
 
     return (
       <Link to={isAdminOrSuperAdmin ? "/admin-space" : "/dashboard"}>
-        <div className="flex items-center space-x-4 md:border-l md:pl-6 border-gray-200 cursor-pointer hover:opacity-85 transition-opacity">
+        <div className="relative group flex items-center space-x-4 md:border-l md:pl-6 border-gray-200 cursor-pointer hover:opacity-85 transition-opacity">
           {profileContent}
+          
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap bg-slate-900 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none shadow-md z-50">
+            {isAdminOrSuperAdmin ? "Espace Admin" : "Mon Dashboard"}
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+          </div>
         </div>
       </Link>
     );
@@ -99,34 +135,47 @@ const Navbar = () => {
             Le Data Place
           </Link>
           
-          {/* Cacher la page feedback pour les guests */}
           {!isGuest && (
             <Link to="/feedback" className={navLinkClass}>
               Feedback
             </Link>
           )}
 
-          {/* Lien Nora */}
-          <Link
-            to="/nora"
-            className="relative py-1 flex items-center gap-1.5 text-gray-900 font-semibold hover:text-[#004751] transition-colors duration-200 after:absolute after:bottom-[-2px] after:left-0 after:w-full after:h-[2px] after:bg-[#004751] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-200 after:origin-left"
-          >
-            <NoraAvatar size="sm" />
-          </Link>
+          {/* Lien Nora + Tooltip */}
+          <div className="relative group flex items-center justify-center">
+            <Link
+              to="/nora"
+              className="relative py-1 flex items-center gap-1.5 text-gray-900 font-semibold hover:text-[#004751] transition-colors duration-200 after:absolute after:bottom-[-2px] after:left-0 after:w-full after:h-[2px] after:bg-[#004751] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-200 after:origin-left"
+            >
+              <NoraAvatar size="sm" />
+            </Link>
+
+            <div className="absolute top-full mt-3 whitespace-nowrap bg-slate-900 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none shadow-md z-50">
+              Demander à Nora
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+            </div>
+          </div>
 
           {/* Profil Utilisateur */}
           {renderProfileBlock()}
 
-          {/* Bouton Logout - Modifie pour etre visible par tout le monde, y compris les guests */}
-          <button
-            onClick={() => {
-              localStorage.clear();
-              navigate("/login");
-            }}
-            className="text-sm font-medium text-slate-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut />
-          </button>
+          {/* Bouton Logout + Tooltip */}
+          <div className="relative group flex items-center justify-center">
+            <button
+              onClick={() => {
+                localStorage.clear();
+                navigate("/login");
+              }}
+              className="text-sm font-medium text-slate-400 hover:text-red-500 transition-colors"
+            >
+              <LogOut />
+            </button>
+
+            <div className="absolute top-full mt-3 whitespace-nowrap bg-red-600 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none shadow-md z-50">
+              Déconnexion
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-red-600 rotate-45" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -158,7 +207,6 @@ const Navbar = () => {
 
           <hr className="border-gray-100 my-2" />
 
-          {/* Section Profil et deconnexion Mobile */}
           <div className="flex items-center justify-between pt-2">
             {renderProfileBlock()}
             

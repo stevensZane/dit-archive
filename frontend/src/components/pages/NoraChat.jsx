@@ -475,14 +475,14 @@ const NoraChat = () => {
             </button>
           )}
           <div className="flex-1">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto mt-15">
               <ChatTermsBanner />
             </div>
           </div>
         </div>
 
         {/* Messages List */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-0">
+        <div className="flex-1 overflow-y-auto px-4 md:px-0 mt-5">
           <div className="max-w-3xl mx-auto pt-10 pb-32">
             {activeChat?.messages.map((msg, idx) => (
                 <MessageBubble key={idx} msg={msg} chat_id={activeChatId.toString()} />

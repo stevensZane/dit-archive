@@ -15,6 +15,9 @@ from dotenv import load_dotenv
 from seeds.seed_admin_users import seed_admin_users 
 from seeds.seed_metadata import seed_metadata
 
+# les listeners
+from listeners import listeners
+
 # Configuration des logs pour voir exactement ce qui se passe sur Railway
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("API-DIT")
