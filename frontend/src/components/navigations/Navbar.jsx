@@ -128,9 +128,6 @@ const Navbar = () => {
           <Link to="/explore" className={navLinkClass}>
             Archives
           </Link>
-          <Link to="/leaderboard" className={navLinkClass}>
-            Leaderboard
-          </Link>
           <Link to="/data-place" className={navLinkClass}>
             Le Data Place
           </Link>

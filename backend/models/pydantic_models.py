@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
+from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 class UserBase(BaseModel):
     first_name: str
@@ -85,3 +87,44 @@ class FeedbackPayload(BaseModel):
 
 class CommentCreate(BaseModel):
     content: str
+
+
+class UserMinimalResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    avatar_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+# Schema de réponse principal
+class ExternalDatasetResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    format: Optional[str] = None
+    size_label: Optional[str] = None
+    rows_label: Optional[str] = None
+    source_name: Optional[str] = None
+    download_url: str
+    cloudinary_public_id: Optional[str] = None
+    license: str
+    is_verified: bool
+    created_at: datetime
+    uploaded_by_id: Optional[int] = None
+    uploader: Optional[UserMinimalResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+# Schema pour la mise à jour partielle des infos
+class ExternalDatasetUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    format: Optional[str] = None
+    size_label: Optional[str] = None
+    rows_label: Optional[str] = None
+    source_name: Optional[str] = None
+    license: Optional[str] = None
+    is_verified: Optional[bool] = None

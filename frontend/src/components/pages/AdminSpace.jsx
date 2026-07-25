@@ -9,6 +9,8 @@ import {
   MessageSquare,
   Megaphone,
   RefreshCw,
+  BarChart3,
+  ClipboardCheck
 } from "lucide-react";
 import api from "../api/axios";
 import Navbar from "../navigations/Navbar";
@@ -102,7 +104,6 @@ const AdminSpace = () => {
     
     setIsSyncingScores(true);
     try {
-      // Ton endpoint de recalcul global
       await api.post("/admin/sync-old-points");
       alert("Recalcul global terminé avec succès !");
       fetchData(true);
@@ -150,6 +151,29 @@ const AdminSpace = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {isSuperAdmin && (
+              <>
+                {/* BOUTON ACCÈS DASHBOARD BI */}
+                <button
+                  onClick={() => window.location.href = "/dashboard-bi"} 
+                  className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <BarChart3 size={16} className="text-[#004751]" />
+                  <span>Dashboard BI</span>
+                </button>
+
+                {/* BOUTON SUIVI DES DÉPÔTS PÉDAGOGIQUES */}
+                <button
+                  onClick={() => window.location.href = "/admin-submissions"} 
+                  className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <ClipboardCheck size={16} className="text-emerald-600" />
+                  <span>Suivi des Dépôts</span>
+                </button>
+              </>
+            )}
+
+            {/* BOUTON AJOUTER PROJET */}
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-2 px-5 py-3 bg-[#004751] text-white rounded-2xl text-[10px] font-black uppercase hover:bg-slate-800 transition-all shadow-lg shadow-teal-900/20"
@@ -158,6 +182,7 @@ const AdminSpace = () => {
               <span>Ajouter Projet</span>
             </button>
 
+            {/* ZONE FILTRES D'AFFICHAGE */}
             <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
               <FilterBtn
                 active={filter === "completed"}
@@ -187,7 +212,7 @@ const AdminSpace = () => {
               )}
             </div>
 
-            {/* BOUTON DES TROIS POINTS (Remplacement du refresh) */}
+            {/* MENU CONTEXTUEL (TROIS POINTS) */}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -200,7 +225,6 @@ const AdminSpace = () => {
                 )}
               </button>
 
-              {/* Menu Contextuel Déroulant */}
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-3 duration-200">
                   <button
@@ -243,7 +267,6 @@ const AdminSpace = () => {
           ) : (
             <div className="grid gap-6 animate-in fade-in duration-500">
               {(() => {
-                // Normalisation et filtrage intelligent
                 const filteredProjects = projects.filter((p) => {
                   const status = p.analysis_status?.toLowerCase();
                   
@@ -251,7 +274,6 @@ const AdminSpace = () => {
                     return status === "completed" || status === "success";
                   }
                   if (filter === "error") {
-                    // Gère si ton back renvoie "error", "failed" ou "failed_analysis" en majuscules ou minuscules
                     return status === "error" || status === "failed" || status?.includes("fail");
                   }
                   return status === filter;
@@ -288,7 +310,6 @@ const AdminSpace = () => {
         refreshData={fetchData}
       />
 
-      {/* NOUVEAUX MODALS INJECTÉS EN BAS POUR GARDER LE CODE CLEAN */}
       <AdminFeedbacksModal isOpen={isFeedbacksOpen} onClose={() => setIsFeedbacksOpen(false)} />
       <AdminBroadcastModal isOpen={isBroadcastOpen} onClose={() => setIsBroadcastOpen(false)} />
     </div>

@@ -31,11 +31,23 @@ const ProjectCard = ({ project, onEdit }) => {
             {project.program?.name || 'Filière'} • {project.academic_year?.label || 'Année'}
           </p>
           
-          <div className="flex flex-wrap gap-1.5">
+          {/* <div className="flex flex-wrap gap-1.5">
             {project.technologies_list ? (
               project.technologies_list.split(',').slice(0, 4).map(tech => (
                 <span key={tech.trim()} className="text-[9px] font-black bg-slate-50 text-slate-500 px-2 py-0.5 rounded border border-slate-100 uppercase">
                   {tech.trim()}
+                </span>
+              ))
+            ) : (
+              <span className="text-[10px] text-slate-300 italic">Analyse par Nora en cours...</span>
+            )}
+          </div> */}
+          {/* // Dans ProjectCard.jsx, remplace la section de rendu des technos (ligne ~32) par ceci : */}
+          <div className="flex flex-wrap gap-1.5">
+            {project.technologies_list ? (
+              project.technologies_list.split(',').slice(0, 4).map(tech => (
+                <span key={tech.trim()} className="text-[9px] font-black bg-slate-50 text-slate-500 px-2 py-0.5 rounded border border-slate-100 uppercase">
+                  #{tech.trim()} {/* 🟢 Ajout du symbole hashtag */}
                 </span>
               ))
             ) : (

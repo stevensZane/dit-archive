@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { 
-  ExternalLink, Trash2, Loader2, AlertCircle, 
-  BrainCircuit, Github, User, Calendar, Eye
+  Trash2, Loader2, AlertCircle, 
+  Github, User, Calendar, Eye
 } from 'lucide-react';
 import api from "../api/axios";
 import { Link } from 'react-router-dom';
 
 const ProjectItem = ({ project, refresh }) => {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isIngesting, setIsIngesting] = useState(false);
 
   // --- ACTION : SUPPRIMER ---
   const handleDelete = async () => {
@@ -26,19 +25,6 @@ const ProjectItem = ({ project, refresh }) => {
       alert("Erreur lors de la suppression.");
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  // --- ACTION : APPRENDRE (Ingestion Nora) ---
-  const handleIngest = async () => {
-    setIsIngesting(true);
-    try {
-      await api.post(`/chatbot/ingest/${project.id}`);
-      alert("Nora analyse maintenant ce projet pour enrichir son savoir.");
-    } catch (err) {
-      alert("Erreur lors de l'apprentissage.");
-    } finally {
-      setIsIngesting(false);
     }
   };
 
@@ -66,7 +52,7 @@ const ProjectItem = ({ project, refresh }) => {
           )}
         </div>
 
-        {/* Titre maintenant cliquable via Link */}
+        {/* Titre cliquable */}
         <Link to={`/project/${project.id}`}>
           <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-[#E91E63] transition-colors cursor-pointer">
             {project.title}
@@ -87,18 +73,7 @@ const ProjectItem = ({ project, refresh }) => {
       {/* ACTIONS */}
       <div className="flex items-center gap-3 w-full md:w-auto justify-end border-t md:border-t-0 pt-4 md:pt-0">
         
-        {/* BOUTON APPRENDRE */}
-        <button 
-          onClick={handleIngest}
-          disabled={isIngesting || project.analysis_status === 'error'}
-          className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-purple-50 text-purple-600 rounded-2xl text-[10px] font-black uppercase hover:bg-purple-600 hover:text-white transition-all border border-purple-100 disabled:opacity-30 disabled:hover:bg-purple-50 disabled:hover:text-purple-600"
-          title="Ajouter ce projet à la mémoire de Nora"
-        >
-          {isIngesting ? <Loader2 size={14} className="animate-spin" /> : <BrainCircuit size={14} />}
-          <span>Apprendre</span>
-        </button>
-
-        {/* NOUVEAU : BOUTON VOIR LE PROJET (Lien interne) */}
+        {/* BOUTON VOIR LE PROJET (Lien interne) */}
         <Link 
           to={`/project/${project.id}`}
           className="p-3.5 bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all"
@@ -108,15 +83,17 @@ const ProjectItem = ({ project, refresh }) => {
         </Link>
 
         {/* LIEN GITHUB (Lien externe) */}
-        <a 
-          href={project.github_repository_url} 
-          target="_blank" 
-          rel="noreferrer" 
-          className="p-3.5 bg-slate-50 text-slate-400 hover:text-[#004751] hover:bg-slate-100 rounded-2xl transition-all"
-          title="Ouvrir le dépôt GitHub"
-        >
-          <Github size={18} />
-        </a>
+        {project.github_repository_url && (
+          <a 
+            href={project.github_repository_url} 
+            target="_blank" 
+            rel="noreferrer" 
+            className="p-3.5 bg-slate-50 text-slate-400 hover:text-[#004751] hover:bg-slate-100 rounded-2xl transition-all"
+            title="Ouvrir le dépôt GitHub"
+          >
+            <Github size={18} />
+          </a>
+        )}
         
         {/* BOUTON SUPPRIMER */}
         <button 

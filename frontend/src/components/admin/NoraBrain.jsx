@@ -112,7 +112,7 @@ const NoraBrain = () => {
             </div>
 
             {/* Action 2 : Synchronisation Site Web */}
-            <div className="bg-white p-6 rounded-[40px] border border-slate-100 shadow-sm text-center">
+            {/* <div className="bg-white p-6 rounded-[40px] border border-slate-100 shadow-sm text-center">
                 <div className="w-14 h-14 bg-[#004751]/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <RefreshCw className="text-[#004751]" size={24} />
                 </div>
@@ -126,7 +126,7 @@ const NoraBrain = () => {
                 >
                     {syncing ? <Loader2 className="animate-spin" size={16} /> : "Synchroniser le site"}
                 </button>
-            </div>
+            </div> */}
         </div>
 
         {/* LISTE DES DOCUMENTS */}

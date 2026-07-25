@@ -3,13 +3,15 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, T
 from sqlalchemy.orm import relationship
 from config.database import Base
 from pgvector.sqlalchemy import Vector
+from sqlalchemy.sql import func
 
 # Table de liaison Many-to-Many pour les technologies
 project_technologies = Table(
     "project_technologies",
     Base.metadata,
     Column("project_id", Integer, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True),
-    Column("technology_id", Integer, ForeignKey("technologies.id", ondelete="CASCADE"), primary_key=True))
+    Column("technology_id", Integer, ForeignKey("technologies.id", ondelete="CASCADE"), primary_key=True)
+)
 
 class Program(Base):
     __tablename__ = "programs"
@@ -59,6 +61,7 @@ class User(Base):
     comments = relationship("Comment", back_populates="user")
     likes = relationship("Like", back_populates="user")
     feedbacks = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
+    datasets = relationship("ExternalDataset", back_populates="uploader")
     
     @property
     def league_rank(self) -> dict:
@@ -86,6 +89,7 @@ class Project(Base):
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     project_type = Column(String(50), nullable=False, default="academic")
+    tags = Column(Text, nullable=True)
     
     analysis_status = Column(String, default="pending") 
     is_historical = Column(Boolean, default=False)
@@ -224,3 +228,37 @@ class SchoolVector(Base):
     
     # Le vecteur généré par Nomic (Nomic embed v1.5 fait 768 dimensions)
     embedding = Column(Vector(768))
+
+class ExternalDataset(Base):
+    __tablename__ = "external_datasets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(100), index=True) # NLP, Vision, Transport, etc.
+    format = Column(String(50)) # CSV, Parquet, JSON, Images
+    size_label = Column(String(50)) # ex: "150 MB"
+    rows_label = Column(String(50)) # ex: "500k lignes"
+    source_name = Column(String(100)) # Kaggle, HuggingFace, DIT Lab
+    
+    # Lien du fichier hébergé sur Cloudinary (ou URL externe)
+    download_url = Column(Text, nullable=False)
+    
+    # Identifiant Cloudinary pour faciliter la suppression/mise à jour du fichier
+    cloudinary_public_id = Column(String(255), nullable=True)
+    
+    license = Column(String(100), default="Open Data")
+    is_verified = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # --- Relation avec l'utilisateur qui téléverse le dataset ---
+    uploaded_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploader = relationship("User", back_populates="datasets")
+
+class StudentRoster(Base):
+    __tablename__ = "student_roster"
+    id = Column(Integer, primary_key=True)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True)
+    level = Column(String, nullable=False) # 'L1', 'L2', 'L3', 'M1', 'M2'

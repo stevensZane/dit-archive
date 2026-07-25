@@ -1,0 +1,986 @@
+Vérifie moi tout ça please, cette page dois être finit là tout de suite, vite fait, ensuite je remet le site en ligne
+
+voici la page
+import React, { useState, useEffect } from "react";
+import { 
+  ArrowLeft, 
+  UploadCloud, 
+  CheckCircle2, 
+  XCircle, 
+  FileText, 
+  Search, 
+  Filter,
+  UserCheck
+} from "lucide-react";
+import api from "../api/axios";
+import Navbar from "../navigations/Navbar";
+
+const AdminSubmissions = () => {
+  const [selectedLevel, setSelectedLevel] = useState("L1");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all"); // all, deposited, missing
+  const [rosterData, setRosterData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  // États pour le lecteur de rapport interne
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportUrl, setReportUrl] = useState("");
+
+  const levels = ["L1", "L2", "L3", "M1", "M2"];
+
+  // Charger le statut des dépôts pour la classe sélectionnée
+  const fetchSubmissionsStatus = async () => {
+    setLoading(true);
+    try {
+      // Cet endpoint prend le niveau (L1..M2) et retourne la liste croisée des étudiants (Roster vs BD)
+      const res = await api.get(`/admin/submissions-status?level=${selectedLevel}`);
+      setRosterData(res.data);
+    } catch (err) {
+      console.error("Erreur lors de la récupération des dépôts:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubmissionsStatus();
+  }, [selectedLevel]);
+
+  // Gérer l'import du fichier Excel/CSV de la liste officielle de la classe
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("level", selectedLevel);
+
+    setUploading(true);
+    try {
+      // Endpoint pour téléverser le listing étudiant officiel de la promotion
+      await api.post("/admin/roster/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      alert("Liste officielle mise à jour et synchronisée avec succès !");
+      fetchSubmissionsStatus();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'importation du fichier.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Ouvrir le rapport en mode sécurisé (Logique copiée de ton ProjectDetail)
+  const handleViewReport = (projectId) => {
+    const baseUrl = api.defaults.baseURL.replace(/\/$/, "");
+    const token = localStorage.getItem("votre_cle_token");
+    const secureUrl = `${baseUrl}/projects/${projectId}/report?action=view&token=${token}`;
+    setReportUrl(secureUrl);
+    setIsReportOpen(true);
+  };
+
+  // Filtrage des données côté client pour la recherche dynamique
+  const filteredStudents = rosterData.filter((student) => {
+    const matchesSearch = `${student.first_name} ${student.last_name}`
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    
+    if (filterStatus === "deposited") return matchesSearch && student.has_deposited;
+    if (filterStatus === "missing") return matchesSearch && !student.has_deposited;
+    return matchesSearch;
+  });
+
+  return (
+    <div className="min-h-screen bg-[#FDFDFD] pb-20">
+      <Navbar />
+      
+      <main className="max-w-6xl mx-auto pt-32 px-6">
+        {/* En-tête de retour */}
+        <button
+          onClick={() => window.location.href = "/admin-space"}
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-[#004751] font-medium mb-8 transition-colors group text-sm"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          Retour à la Console Admin
+        </button>
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 pb-6 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2 mb-2 text-emerald-600">
+              <UserCheck size={18} />
+              <span className="text-[10px] font-black uppercase tracking-[0.3em]">
+                Scolarité & Pédagogie
+              </span>
+            </div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+              Suivi des <span className="text-[#004751]">Rapports</span>
+            </h1>
+          </div>
+
+          {/* Zone d'import de la liste officielle Excel/CSV */}
+          <div className="relative">
+            <label className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 border-dashed transition-all cursor-pointer ${
+              uploading 
+                ? "bg-slate-50 border-slate-300 text-slate-400" 
+                : "bg-white border-slate-200 text-slate-700 hover:border-[#004751] hover:bg-slate-50"
+            }`}>
+              <UploadCloud size={16} className="text-slate-400" />
+              <span>{uploading ? "Importation..." : `Importer Roster ${selectedLevel}`}</span>
+              <input 
+                type="file" 
+                accept=".csv, .xlsx, .xls" 
+                className="hidden" 
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Sélecteur de classe (L1 à M2) */}
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-fit mb-8">
+          {levels.map((lvl) => (
+            <button
+              key={lvl}
+              onClick={() => setSelectedLevel(lvl)}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${
+                selectedLevel === lvl 
+                  ? "bg-white shadow-sm text-[#004751]" 
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              {lvl}
+            </button>
+          ))}
+        </div>
+
+        {/* Barre de recherche et de filtres de statut */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Rechercher un étudiant..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#004751] transition-all"
+            />
+          </div>
+
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+            <button
+              onClick={() => setFilterStatus("all")}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${filterStatus === "all" ? "bg-slate-900 text-white" : "bg-slate-50 border border-slate-200 text-slate-600"}`}
+            >
+              Tous ({rosterData.length})
+            </button>
+            <button
+              onClick={() => setFilterStatus("deposited")}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${filterStatus === "deposited" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-50 border border-slate-200 text-slate-600"}`}
+            >
+              Déposés ({rosterData.filter(r => r.has_deposited).length})
+            </button>
+            <button
+              onClick={() => setFilterStatus("missing")}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${filterStatus === "missing" ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-slate-50 border border-slate-200 text-slate-600"}`}
+            >
+              Manquants ({rosterData.filter(r => !r.has_deposited).length})
+            </button>
+          </div>
+        </div>
+
+        {/* Liste des étudiants et état de dépôt */}
+        <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="text-center py-20 text-slate-400 font-medium animate-pulse">
+              Analyse de la liste de la promotion en cours...
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="text-center py-20 bg-slate-50/50 italic text-slate-400 text-sm">
+              Aucun étudiant trouvé. Veuillez importer une liste ou modifier vos filtres.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70">
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Étudiant</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Statut</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Date de dépôt</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Projet associé</th>
+                    <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredStudents.map((student, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                      <td className="px-8 py-4">
+                        <div className="font-bold text-slate-800 text-sm">
+                          {student.last_name.toUpperCase()} {student.first_name}
+                        </div>
+                        <div className="text-xs text-slate-400">{student.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {student.has_deposited ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold">
+                            <CheckCircle2 size={14} /> Déposé
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 rounded-full text-xs font-bold">
+                            <XCircle size={14} /> Manquant
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        {student.deposited_at 
+                          ? new Date(student.deposited_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) 
+                          : "-"}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-700 max-w-xs truncate">
+                        {student.project_title || "-"}
+                      </td>
+                      <td className="px-8 py-4 text-right">
+                        {student.has_deposited && student.project_id ? (
+                          <button
+                            onClick={() => handleViewReport(student.project_id)}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#004751] hover:text-[#E91E63] transition-colors"
+                          >
+                            <FileText size={14} /> Voir le rapport
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-300 pointer-events-none">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* MODAL DU LECTEUR DE RAPPORT INTERNE (Identique au fonctionnement du système globale) */}
+      {isReportOpen && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full h-full max-w-5xl rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2 text-[#004751]">
+                <FileText size={20} />
+                <span className="text-xs font-black uppercase tracking-widest">Visionneuse de Rapport Institutionnel</span>
+              </div>
+              <button 
+                onClick={() => setIsReportOpen(false)}
+                className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 bg-slate-800">
+              <iframe
+                src={reportUrl}
+                title="Lecteur de Rapport PDF"
+                className="w-full h-full border-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminSubmissions;
+
+voici le router
+import pandas as pd
+from io import BytesIO
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+from typing import List
+from datetime import datetime
+
+# Importe tes dépendances de base de données et modèles réels ici
+from config.database import get_db
+from models import StudentRoster, User, Project
+
+router = APIRouter(prefix="/admin", tags=["Admin Submissions"])
+
+@router.get("/submissions-status")
+def get_submissions_status(
+    level: str = Query(..., description="Le niveau requis (L1, L2, L3, M1, M2)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Retourne la liste complète croisée des étudiants attendus (Roster) 
+    avec l'état de leur dépôt réel dans la table des projets.
+    """
+    # 1. Récupérer tous les étudiants inscrits officiellement dans ce niveau
+    roster_students = db.query(StudentRoster).filter(StudentRoster.level == level).all()
+    
+    if not roster_students:
+        return []
+
+    # 2. Récupérer tous les projets liés à ce niveau pour vérifier les dépôts
+    # Jointure avec User pour s'assurer que l'owner correspond
+    projects = db.query(Project).filter(Project.level == level).all()
+    
+    # Mapper les projets par l'email de l'owner pour un croisement rapide et fiable
+    projects_by_email = {}
+    for p in projects:
+        if p.owner and p.owner.email:
+            projects_by_email[p.owner.email.lower()] = p
+
+    response_data = []
+    
+    for s in roster_students:
+        student_email_lower = s.email.lower()
+        project_associated = projects_by_email.get(student_email_lower)
+        
+        has_deposited = project_associated is not None
+        
+        response_data.append({
+            "first_name": s.first_name,
+            "last_name": s.last_name,
+            "email": s.email,
+            "has_deposited": has_deposited,
+            "deposited_at": project_associated.created_at.isoformat() if has_deposited and project_associated.created_at else None,
+            "project_title": project_associated.title if has_deposited else None,
+            "project_id": project_associated.id if has_deposited else None
+        })
+        
+    # Tri alphabétique par nom de famille
+    return sorted(response_data, key=lambda x: x["last_name"])
+
+
+@router.post("/roster/upload")
+async def upload_roster(
+    level: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Prend un fichier Excel ou CSV contenant les colonnes (first_name, last_name, email),
+    nettoie l'ancien roster de ce niveau spécifique, et insère les nouveaux enregistrements.
+    """
+    contents = await file.read()
+    
+    try:
+        # Lecture adaptative selon l'extension du fichier
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(BytesIO(contents))
+        elif file.filename.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(BytesIO(contents))
+        else:
+            raise HTTPException(status_code=400, detail="Format de fichier non supporté (.csv, .xlsx, .xls uniquement)")
+        
+        # Normalisation des noms de colonnes requis par le modèle pour éviter les crashs
+        required_cols = {"first_name", "last_name", "email"}
+        df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
+        
+        # Mapping si les colonnes contiennent des variantes courantes
+        column_mapping = {
+            "prenom": "first_name",
+            "nom": "last_name",
+            "mail": "email"
+        }
+        df = df.rename(columns=column_mapping)
+        
+        if not required_cols.issubset(df.columns):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Le fichier doit contenir les colonnes suivantes : {list(required_cols)}"
+            )
+            
+        # Nettoyage de l'ancien roster pour ce niveau (évite les doublons de promotion)
+        db.query(StudentRoster).filter(StudentRoster.level == level).delete()
+        
+        # Insertion des nouveaux étudiants
+        for _, row in df.iterrows():
+            if pd.isna(row["email"]) or pd.isna(row["first_name"]) or pd.isna(row["last_name"]):
+                continue # Ignore les lignes incomplètes
+                
+            new_student = StudentRoster(
+                first_name=str(row["first_name"]).strip(),
+                last_name=str(row["last_name"]).strip(),
+                email=str(row["email"]).strip(),
+                level=level
+            )
+            db.add(new_student)
+            
+        db.commit()
+        return {"status": "success", "message": f"Le roster pour le niveau {level} a été mis à jour."}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du fichier: {str(e)}")
+
+remarque que ça utilise même pas User en fait
+
+voici mon router pour les projets avec le nouvel endpoint
+
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, BackgroundTasks, Request
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
+from typing import Optional, List
+from config.database import get_db
+from models.sql_models import ProjectInteraction, Project, User, Comment, Like, Technology, Program, AcademicYear
+from utils.auth_utils import get_current_user_optional
+from services.services import process_and_archive_project
+from utils.auth_utils import get_current_user
+from fastapi.responses import StreamingResponse, FileResponse
+from services.ai import call_groq_api
+from utils.cloudinary_utils import upload_to_cloudinary
+import httpx
+from models.pydantic_models import CommentCreate
+import os
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+
+load_dotenv()
+
+router = APIRouter(
+    prefix="",
+    tags=["projects"]
+)
+
+
+@router.post("/upload")
+async def create_new_project(
+    background_tasks: BackgroundTasks,
+    title: str = Form(...),
+    description: str = Form(...),
+    github_url: str = Form(None),
+    tags: Optional[str] = Form(None), # Nouveau champ hashtags (reçu sous forme de chaîne "tag1,tag2")
+    project_type: str = Form(...), 
+    academic_year_id: Optional[int] = Form(None), 
+    report_pdf: UploadFile = File(...), 
+    screenshot_files: List[UploadFile] = File(None), 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # 1. Upload du PDF sur Cloudinary
+    pdf_url = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
+    
+    # 2. Upload des Screenshots
+    screenshot_urls = []
+    if screenshot_files:
+        for img in screenshot_files:
+            url = upload_to_cloudinary(img.file, folder="projects/screenshots")
+            if url:
+                screenshot_urls.append(url)
+    
+    screenshots_str = ",".join(screenshot_urls) if screenshot_urls else None
+
+    # Logique d'attribution dynamique de l'année académique
+    chosen_academic_year = academic_year_id if academic_year_id is not None else current_user.academic_year_id
+
+    # 3. Création de l'entrée en Base de Données
+    new_project = Project(
+        title=title,
+        description=description,
+        github_repository_url=github_url,
+        tags=tags, # Sauvegarde des hashtags en BDD
+        project_type=project_type,
+        report_pdf_url=pdf_url,
+        screenshots=screenshots_str,
+        academic_year_id=chosen_academic_year,
+        program_id=current_user.program_id,
+        level=current_user.level,
+        owner_id=current_user.id,
+        analysis_status="pending",
+        views_count=0,
+        downloads_count=0
+    )
+
+    db.add(new_project)
+    db.commit()
+    db.refresh(new_project)
+    
+    # 4. Traitement asynchrone (Pipeline d'archivage / Nora)
+    # On lance TOUJOURS la tâche de fond pour que Nora lise le document.
+    # Ton script 'process_and_archive_project' devra vérifier si le projet a un github_url ou s'il doit analyser uniquement le PDF.
+    background_tasks.add_task(process_and_archive_project, new_project.id)
+
+    return {
+        "message": "Projet créé avec succès !",
+        "project_id": new_project.id,
+        "pdf_url": pdf_url
+    }
+
+@router.put("/projects/{project_id}")
+async def update_project(
+    project_id: int,
+    title: str = Form(...),
+    description: str = Form(...),
+    github_url: str = Form(...),
+    report_pdf: Optional[UploadFile] = File(None),
+    screenshot_files: Optional[List[UploadFile]] = File(None),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Récupération (Vérifie bien si c'est owner_id ou user_id dans ton modèle)
+    project = db.query(Project).filter(Project.id == project_id).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet non trouvé")
+
+    if project.owner_id != current_user.id: # Aligné sur ton POST
+        raise HTTPException(status_code=403, detail="Action non autorisée")
+
+    # 2. Mise à jour des champs simples
+    project.title = title
+    project.description = description
+    project.github_repository_url = github_url # Aligné sur ton POST
+
+    # 3. Nouveau PDF (uniquement si fourni)
+    if report_pdf:
+        # Utilise la même fonction que le POST
+        new_pdf_url = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
+        project.report_pdf_url = new_pdf_url
+
+    # 4. Nouvelles Images (uniquement si fournies)
+    if screenshot_files:
+        new_screenshot_urls = []
+        for img in screenshot_files:
+            url = upload_to_cloudinary(img.file, folder="projects/screenshots")
+            if url:
+                new_screenshot_urls.append(url)
+        
+        if new_screenshot_urls:
+            # Choix : soit on remplace tout, soit on ajoute à l'existant
+            # Ici, on ajoute à la chaîne existante (format CSV)
+            current_imgs = project.screenshots + "," if project.screenshots else ""
+            project.screenshots = current_imgs + ",".join(new_screenshot_urls)
+
+    db.commit()
+    db.refresh(project)
+    
+    return {
+        "message": "Projet mis à jour avec succès", 
+        "project_id": project.id
+    }
+
+
+@router.get("/projects/search")
+def search_projects(
+    q: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    if not q or len(q) < 2:
+        return []
+
+    search_term = f"%{q}%"
+
+    # 1. On prépare la requête avec toutes les jointures nécessaires pour la recherche et le rendu
+    query = (
+        db.query(Project)
+        .join(User, Project.owner_id == User.id, isouter=True)
+        .join(Project.technologies, isouter=True)  # Jointure pour chercher dans les technos
+        .join(Program, Project.program_id == Program.id, isouter=True) # Jointure filière / programme
+        .join(AcademicYear, Project.academic_year_id == AcademicYear.id, isouter=True) # Jointure classe / année
+    )
+
+    # 2. Construction des filtres dynamiques (titre, description, auteur, technos, filières, classes)
+    conditions = [
+        Project.title.ilike(search_term),
+        Project.description.ilike(search_term),
+        # Recherche par auteur (Historique ou Utilisateur connecté)
+        Project.author_name.ilike(search_term), 
+        User.first_name.ilike(search_term),
+        User.last_name.ilike(search_term),
+        # Recherche par stack / hashtag
+        Technology.name.ilike(search_term),
+        # Recherche par filière / programme (Nom complet ou abréviation)
+        Program.name.ilike(search_term),
+        # Recherche par niveau / classe (Ex: "Licence 3", "Master", "2024-2025")
+        Project.level.ilike(search_term),
+        AcademicYear.label.ilike(search_term)
+    ]
+
+    # 3. Exécution avec distinct() pour éviter les doublons dus aux jointures multiples (plusieurs technos par projet)
+    results = query.filter(or_(*conditions)).distinct().all()
+
+    # 4. Formatage strict et complet aligné avec ce que tes cartes frontend attendent !
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "description": p.description,
+            "github_url": p.github_repository_url,
+            "project_type": p.project_type,
+            "level": p.level,
+            "screenshots": p.screenshots,
+            "report_pdf_url": p.report_pdf_url,
+            "analysis_status": p.analysis_status,
+            "is_historical": p.is_historical,
+            # Gestion de l'auteur unifiée
+            "author_name": p.author_name if p.is_historical else f"{p.owner.first_name} {p.owner.last_name}" if p.owner else "Étudiant DIT",
+            "owner": {
+                "first_name": p.owner.first_name,
+                "last_name": p.owner.last_name
+            } if p.owner else None,
+            # Gestion du programme / filière
+            "program_id": p.program_id,
+            "program": {
+                "id": p.program.id,
+                "name": p.program.name
+            } if p.program else None,
+            # Gestion de l'année académique
+            "academic_year_id": p.academic_year_id,
+            "academic_year": {
+                "id": p.academic_year.id,
+                "label": p.academic_year.label
+            } if p.academic_year else None,
+            # 🟢 CRUCIAL : Recréer la chaîne 'technologies_list' pour que ExploreProjectCard ne crash pas
+            "technologies_list": ", ".join([t.name for t in p.technologies]) if p.technologies else None
+        } 
+        for p in results
+    ]
+
+@router.get("/projects/me")
+def get_my_projects(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # On récupère les projets de l'utilisateur connecté
+    projects = db.query(Project).filter(Project.owner_id == current_user.id).all()
+    
+    results = []
+    for p in projects:
+        results.append({
+            "id": p.id, 
+            "title": p.title,
+            "status": p.analysis_status, # CRUCIAL pour l'affichage des badges (archived/pending)
+            "technologies_list": p.technologies_list, # La string scanée par Nora
+            "program": {
+                "name": p.program.name if p.program else "N/A"
+            },
+            "academic_year": {
+                "label": p.academic_year.label if p.academic_year else "N/A"
+            },
+            # On s'assure d'utiliser le bon nom de colonne pour l'URL
+            "github_repository_url": p.github_repository_url 
+        })
+    
+    return results
+
+@router.get("/projects/{id}/report")
+async def get_project_report(id: int, action: str = "view", db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == id).first()
+    if not project or not project.report_pdf_url:
+        raise HTTPException(status_code=404, detail="Rapport introuvable en base de données")
+
+    try:
+        # Récupération de tes identifiants Cloudinary dans le .env
+        api_key = os.getenv("CLOUDINARY_API_KEY")
+        api_secret = os.getenv("CLOUDINARY_API_SECRET")
+
+        # LA CORRECTION : On s'authentifie auprès de Cloudinary pour briser le 401
+        client = httpx.AsyncClient(
+            follow_redirects=True,
+            auth=(api_key, api_secret) if api_key and api_secret else None
+        )
+        
+        cloudinary_req = client.build_request("GET", project.report_pdf_url.strip())
+        cloudinary_resp = await client.send(cloudinary_req, stream=True)
+
+        if cloudinary_resp.status_code != 200:
+            await client.aclose()
+            raise HTTPException(status_code=404, detail="Fichier introuvable sur Cloudinary")
+
+        disposition = f'attachment; filename="Rapport_{project.title}.pdf"' if action == "download" else "inline"
+
+        return StreamingResponse(
+            cloudinary_resp.aiter_bytes(),
+            status_code=cloudinary_resp.status_code,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": disposition,
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            },
+            background=client.aclose
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+    
+
+@router.get("/projects/{project_id}")
+def get_project(project_id: int, db: Session = Depends(get_db)):
+    # On utilise joinedload pour "forcer" la récupération des relations en une seule requête SQL
+    project = db.query(Project)\
+        .options(
+            joinedload(Project.owner),
+            joinedload(Project.academic_year),
+            joinedload(Project.program),
+            joinedload(Project.technologies) # Si tu as une table de jointure pour la stack
+        )\
+        .filter(Project.id == project_id)\
+        .first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet non trouvé")
+    
+    return project
+
+@router.get("/projects")
+def get_all_projects(
+    program_id: Optional[int] = Query(None),
+    year_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    # On utilise .joinedload() pour que SQLAlchemy récupère les infos liées en UNE SEULE requête
+    # C'est beaucoup plus rapide pour ton API
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(Project).options(
+        joinedload(Project.program),
+        joinedload(Project.academic_year),
+        joinedload(Project.owner),
+        joinedload(Project.technologies)
+    )
+
+    if program_id:
+        query = query.filter(Project.program_id == program_id)
+    if year_id:
+        query = query.filter(Project.academic_year_id == year_id)
+    
+    # On ne montre que ce qui est archivé/approuvé sur l'Explore
+    query = query.filter(Project.analysis_status.in_(["completed", "archived"]))
+    
+    projects = query.order_by(Project.created_at.desc()).all()
+
+    # Transformation pour ajouter le compteur de likes
+    # (Tu peux aussi le faire via une subquery SQL pour plus de perfs)
+    for p in projects:
+        p.likes_count = len(p.likes)
+        
+    return projects
+
+@router.post("/projects/{project_id}/like")
+def toggle_like(
+    project_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Chercher si le like existe déjà
+    existing_like = db.query(Like).filter(
+        Like.project_id == project_id, 
+        Like.user_id == current_user.id
+    ).first()
+
+    if existing_like:
+        # Si existe, on le retire (Unlike)
+        db.delete(existing_like)
+        db.commit()
+        return {"message": "Unliked", "liked": False}
+    else:
+        # Sinon, on le crée (Like)
+        new_like = Like(project_id=project_id, user_id=current_user.id)
+        db.add(new_like)
+        db.commit()
+        return {"message": "Liked", "liked": True}
+    
+@router.get("/projects/{project_id}/ai-summary")
+async def get_project_ai_summary(project_id: int, db: Session = Depends(get_db)):
+    project = db.get(Project, project_id)
+    
+    # 1. Vérifie si on a déjà un résumé en base pour économiser des jetons API
+    if project.ai_summary:
+        return {"summary": project.ai_summary}
+
+    # 2. Prépare les données pour Groq
+    content_to_analyze = f"""
+    Titre: {project.title}
+    Description: {project.description}
+    README: {project.readme_content}
+    Technologies: {project.technologies_list}
+    """
+
+    # 3. Appelle ton service Groq avec un "System Prompt" spécial Résumé
+    try:
+        summary = await call_groq_api(
+            system_prompt="""
+                Tu es Nora, l'IA de la bibliothèque DIT.
+                Ton rôle est de faire un résumé technique, inspirant et structuré du 
+                projet suivant en 4-5 phrases maximum.
+                
+                Tu utilises seulement le contenu du readme, n'inventes rien. 
+                Si le readme est anglais comprends le et traduits le.
+                
+                Génère un résumé structuré en Markdown professionnel, avec des sections 
+                hiérarchisées (##, ###), des listes à puces, et une mise en forme claire ; 
+                mets en évidence les technologies et outils avec du gras et du code, ajoute des 
+                blocs de code si pertinent, et assure une présentation concise, lisible et 
+                visuellement agréable (type documentation moderne).
+                
+                Ne retourne que du Markdown valide, sans texte brut en dehors de la structure.
+            
+            """,
+            user_content=content_to_analyze
+        )
+        
+        # 4. Sauvegarde le résumé pour la prochaine fois
+        project.ai_summary = summary
+        db.commit()
+        
+        return {"summary": summary}
+    except Exception as e:
+        return {"summary": "Nora n'a pas pu analyser ce projet pour le moment."}
+
+
+@router.post("/projects/{project_id}/interact")
+def track_project_interaction(
+    project_id: int,
+    request: Request, # On injecte la requête HTTP pour choper l'IP
+    type: str = Query(..., description="Type d'interaction : 'view' ou 'download'"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+
+    # Si l'utilisateur est connecté (User ou Guest persistant), on prend son ID.
+    # Sinon, on utilise son adresse IP comme identifiant unique temporaire.
+    if current_user and current_user.id != 0:
+        identifier = str(current_user.id)
+        is_ip = False
+    else:
+        # request.client.host récupère l'IP du visiteur (ex: "196.207.245.20")
+        identifier = request.client.host
+        is_ip = True
+
+    # On cherche le doublon dans le bloc-notes sur les dernières 24h
+    time_boundary = datetime.utcnow() - timedelta(hours=24)
+    
+    # On adapte la recherche selon si c'est une IP ou un ID
+    if is_ip:
+        has_already_clicked = db.query(ProjectInteraction).filter(
+            ProjectInteraction.project_id == project_id,
+            ProjectInteraction.interaction_type == type,
+            ProjectInteraction.created_at >= time_boundary,
+            ProjectInteraction.user_id == None, # C'est un anonyme
+            # Si tu veux stocker l'IP, tu peux ajouter une colonne ip_address, 
+            # ou temporairement utiliser un champ texte si tu adaptes ton modèle.
+        ).first() # Pour faire simple sans changer ton modèle, on traque par IP
+    else:
+        has_already_clicked = db.query(ProjectInteraction).filter(
+            ProjectInteraction.project_id == project_id,
+            ProjectInteraction.user_id == current_user.id,
+            ProjectInteraction.interaction_type == type,
+            ProjectInteraction.created_at >= time_boundary
+        ).first()
+
+    if not has_already_clicked:
+        if type == "view":
+            project.views_count += 1
+        elif type == "download":
+            project.downloads_count += 1
+            
+        new_log = ProjectInteraction(
+            user_id=current_user.id if (current_user and current_user.id != 0) else None,
+            project_id=project_id,
+            interaction_type=type
+            # Optionnel : ip_address=identifier si tu l'ajoutes à ton modèle plus tard
+        )
+        db.add(new_log)
+        db.commit()
+        return {"status": "success", "message": f"Compteur {type} incrémenté."}
+
+    return {"status": "ignored", "message": "Anti-spam actif."}
+
+@router.get("/{project_id}/comments")
+def get_project_comments(project_id: int, db: Session = Depends(get_db)):
+    """Récupère tous les commentaires d'un projet ordonnés du plus ancien au plus récent."""
+    # On vérifie si le projet existe
+    if not db.query(Project).filter(Project.id == project_id).first():
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    comments = db.query(Comment).filter(Comment.project_id == project_id).order_by(Comment.created_at.asc()).all()
+    
+    # On structure la réponse proprement pour le frontend
+    return [
+        {
+            "id": c.id,
+            "content": c.content,
+            "created_at": c.created_at.isoformat(),
+            "user": {
+                "id": c.user.id,
+                "username": c.user.username,
+                "first_name": c.user.first_name,
+                "last_name": c.user.last_name,
+                "role": c.user.role
+            } if c.user else {"username": "Utilisateur supprimé", "first_name": "Anonyme", "last_name": ""}
+        } for c in comments
+    ]
+
+@router.post("/{project_id}/comments")
+def add_project_comment(
+    project_id: int, 
+    payload: CommentCreate, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """Ajoute un commentaire sur un projet (Authentification requise)."""
+    if not payload.content.strip():
+        raise HTTPException(status_code=400, detail="Le commentaire ne peut pas être vide")
+        
+    if not db.query(Project).filter(Project.id == project_id).first():
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+
+    new_comment = Comment(
+        project_id=project_id,
+        user_id=current_user.id,
+        content=payload.content
+    )
+    
+    db.add(new_comment)
+    try:
+        db.commit()
+        db.refresh(new_comment)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erreur serveur : {str(e)}")
+        
+    return {"status": "success", "message": "Commentaire ajouté"}
+
+@router.get("/{project_id}/report")
+def stream_project_report(
+    project_id: int,
+    action: str = Query("view"),
+    token: str = Query(...), # Requis par ta logique d'URL sécurisée front-end
+    db: Session = Depends(get_db)
+):
+    """
+    Vérifie l'existence du projet et renvoie le fichier PDF associé de manière sécurisée.
+    """
+    # Optionnel : Valide ici ton token si tu souhaites restreindre l'accès
+    # current_user = verify_token_or_raise_exception(token, db)
+
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+        
+    if not project.report_pdf_url:
+        raise HTTPException(status_code=404, detail="Aucun rapport disponible pour ce projet")
+        
+    # Si ton rapport est stocké localement sur le serveur :
+    file_path = project.report_pdf_url
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Le fichier physique du rapport est introuvable sur le serveur")
+        
+    filename = os.path.basename(file_path)
+    
+    # Gestion de l'affichage (inline) ou du téléchargement (attachment)
+    media_type = "application/pdf"
+    content_disposition = "inline" if action == "view" else "attachment"
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=filename,
+        headers={"Content-Disposition": f"{content_disposition}; filename={filename}"}
+    )
+

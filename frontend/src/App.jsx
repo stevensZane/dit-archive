@@ -18,10 +18,11 @@ import StudentPortal from "./components/pages/StudentSpace";
 import Explore from "./components/pages/Explore";
 import Nora from "./components/pages/NoraChat";
 import AdminSpace from "./components/pages/AdminSpace";
-import Leaderboard from "./components/pages/LeaderBoard";
 import DataPlace from "./components/pages/DataPlace";
 import Feedback from "./components/pages/Feedback";
 import ServiceDown from "./components/pages/ServiceDown";
+import DashboardBI from "./components/pages/DashboardBI"
+import AdminSubmissions from "./components/pages/AdminSubmissions";
 
 function App() {
   const [checkingServer, setCheckingServer] = useState(true);
@@ -142,14 +143,6 @@ function App() {
           }
         />
         <Route
-          path="/leaderboard"
-          element={
-            <ProtectedRoute>
-              <Leaderboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/data-place"
           element={
             <ProtectedRoute>
@@ -162,6 +155,24 @@ function App() {
           element={
             <ProtectedRoute>
               <Feedback />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard-bi"
+          element={
+            <ProtectedRoute>
+              <DashboardBI />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin-submissions"
+          element={
+            <ProtectedRoute>
+              <AdminSubmissions />
             </ProtectedRoute>
           }
         />

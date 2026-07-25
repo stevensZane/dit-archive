@@ -8,7 +8,7 @@ from sqlalchemy import text
 # Importations de ton projet
 from config.database import engine
 from models import sql_models
-from routers import admin, projects, nora, util_endpoints, auth_and_users
+from routers import admin, projects, nora, util_endpoints, auth_and_users, analytics, admin_submissions
 from dotenv import load_dotenv
 
 # Importations de tes scripts de seed
@@ -88,6 +88,8 @@ app.include_router(projects.router)
 app.include_router(nora.router)
 app.include_router(util_endpoints.router)
 app.include_router(auth_and_users.router)
+app.include_router(analytics.router)
+app.include_router(admin_submissions.router)
 
 # Gestion du port pour le déploiement Railway
 if __name__ == "__main__":

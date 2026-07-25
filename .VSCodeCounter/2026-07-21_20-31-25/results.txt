@@ -1,0 +1,58 @@
+Date : 2026-07-21 20:31:25
+Directory : /home/stevens/Documents/work/dit-archive/backend
+Total : 25 files,  2537 codes, 614 comments, 483 blanks, all 3634 lines
+
+Languages
++------------------+------------+------------+------------+------------+------------+
+| language         | files      | code       | comment    | blank      | total      |
++------------------+------------+------------+------------+------------+------------+
+| Python           |         24 |      2,392 |        614 |        482 |      3,488 |
+| pip requirements |          1 |        145 |          0 |          1 |        146 |
++------------------+------------+------------+------------+------------+------------+
+
+Directories
++-------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                          | files      | code       | comment    | blank      | total      |
++-------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                             |         25 |      2,537 |        614 |        483 |      3,634 |
+| . (Files)                                                                     |          2 |        212 |         15 |         19 |        246 |
+| config                                                                        |          2 |         38 |          6 |          8 |         52 |
+| listeners                                                                     |          1 |        107 |         18 |         20 |        145 |
+| models                                                                        |          2 |        281 |         42 |         71 |        394 |
+| routers                                                                       |          8 |      1,270 |        454 |        237 |      1,961 |
+| seeds                                                                         |          2 |         97 |         10 |         17 |        124 |
+| services                                                                      |          5 |        367 |         48 |         74 |        489 |
+| utils                                                                         |          3 |        165 |         21 |         37 |        223 |
++-------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-------------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| filename                                                                      | language         | code       | comment    | blank      | total      |
++-------------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| /home/stevens/Documents/work/dit-archive/backend/config/database.py           | Python           |         20 |          5 |          5 |         30 |
+| /home/stevens/Documents/work/dit-archive/backend/config/system_prompts.py     | Python           |         18 |          1 |          3 |         22 |
+| /home/stevens/Documents/work/dit-archive/backend/listeners/listeners.py       | Python           |        107 |         18 |         20 |        145 |
+| /home/stevens/Documents/work/dit-archive/backend/main.py                      | Python           |         67 |         15 |         18 |        100 |
+| /home/stevens/Documents/work/dit-archive/backend/models/pydantic_models.py    | Python           |         95 |         13 |         22 |        130 |
+| /home/stevens/Documents/work/dit-archive/backend/models/sql_models.py         | Python           |        186 |         29 |         49 |        264 |
+| /home/stevens/Documents/work/dit-archive/backend/requirements.txt             | pip requirements |        145 |          0 |          1 |        146 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/admin.py             | Python           |        283 |         50 |         47 |        380 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/admin_submissions.py | Python           |        113 |         18 |         25 |        156 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/analytics.py         | Python           |        126 |          7 |         17 |        150 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/auth_and_users.py    | Python           |        117 |         18 |         29 |        164 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/dataplace.py         | Python           |        140 |         41 |         32 |        213 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/nora.py              | Python           |         89 |        192 |         16 |        297 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/projects.py          | Python           |        342 |        123 |         58 |        523 |
+| /home/stevens/Documents/work/dit-archive/backend/routers/util_endpoints.py    | Python           |         60 |          5 |         13 |         78 |
+| /home/stevens/Documents/work/dit-archive/backend/seeds/seed_admin_users.py    | Python           |         57 |          5 |          8 |         70 |
+| /home/stevens/Documents/work/dit-archive/backend/seeds/seed_metadata.py       | Python           |         40 |          5 |          9 |         54 |
+| /home/stevens/Documents/work/dit-archive/backend/services/ai.py               | Python           |         19 |          0 |          3 |         22 |
+| /home/stevens/Documents/work/dit-archive/backend/services/mailer.py           | Python           |         84 |         15 |         11 |        110 |
+| /home/stevens/Documents/work/dit-archive/backend/services/scraper.py          | Python           |         75 |          9 |         20 |        104 |
+| /home/stevens/Documents/work/dit-archive/backend/services/services.py         | Python           |        178 |         22 |         35 |        235 |
+| /home/stevens/Documents/work/dit-archive/backend/services/test_send_mail.py   | Python           |         11 |          2 |          5 |         18 |
+| /home/stevens/Documents/work/dit-archive/backend/utils/auth_utils.py          | Python           |        105 |         15 |         24 |        144 |
+| /home/stevens/Documents/work/dit-archive/backend/utils/cloudinary_utils.py    | Python           |         26 |          1 |          4 |         31 |
+| /home/stevens/Documents/work/dit-archive/backend/utils/teste de charge.py     | Python           |         34 |          5 |          9 |         48 |
+| Total                                                                         |                  |      2,537 |        614 |        483 |      3,634 |
++-------------------------------------------------------------------------------+------------------+------------+------------+------------+------------+

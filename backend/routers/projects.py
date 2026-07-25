@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import Optional, List
 from config.database import get_db
-from models.sql_models import ProjectInteraction, Project, User, Comment, Like, Technology
+from models.sql_models import ProjectInteraction, Project, User, Comment, Like, Technology, Program, AcademicYear
 from utils.auth_utils import get_current_user_optional
 from services.services import process_and_archive_project
 from utils.auth_utils import get_current_user
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from services.ai import call_groq_api
 from utils.cloudinary_utils import upload_to_cloudinary
 import httpx
@@ -30,6 +30,7 @@ async def create_new_project(
     title: str = Form(...),
     description: str = Form(...),
     github_url: str = Form(None),
+    tags: Optional[str] = Form(None), # Nouveau champ hashtags (reçu sous forme de chaîne "tag1,tag2")
     project_type: str = Form(...), 
     academic_year_id: Optional[int] = Form(None), 
     report_pdf: UploadFile = File(...), 
@@ -40,7 +41,7 @@ async def create_new_project(
     # 1. Upload du PDF sur Cloudinary
     pdf_url = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
     
-    # 2. Upload des Screenshots (Boucle sur la liste)
+    # 2. Upload des Screenshots
     screenshot_urls = []
     if screenshot_files:
         for img in screenshot_files:
@@ -51,7 +52,6 @@ async def create_new_project(
     screenshots_str = ",".join(screenshot_urls) if screenshot_urls else None
 
     # Logique d'attribution dynamique de l'année académique
-    # Si l'étudiant a laissé "Automatique", on prend l'année actuelle stockée sur son profil.
     chosen_academic_year = academic_year_id if academic_year_id is not None else current_user.academic_year_id
 
     # 3. Création de l'entrée en Base de Données
@@ -59,6 +59,7 @@ async def create_new_project(
         title=title,
         description=description,
         github_repository_url=github_url,
+        tags=tags, # Sauvegarde des hashtags en BDD
         project_type=project_type,
         report_pdf_url=pdf_url,
         screenshots=screenshots_str,
@@ -75,9 +76,10 @@ async def create_new_project(
     db.commit()
     db.refresh(new_project)
     
-    # 4. On lance l'analyse GitHub en tâche de fond
-    if github_url:
-        background_tasks.add_task(process_and_archive_project, new_project.id)
+    # 4. Traitement asynchrone (Pipeline d'archivage / Nora)
+    # On lance TOUJOURS la tâche de fond pour que Nora lise le document.
+    # Ton script 'process_and_archive_project' devra vérifier si le projet a un github_url ou s'il doit analyser uniquement le PDF.
+    background_tasks.add_task(process_and_archive_project, new_project.id)
 
     return {
         "message": "Projet créé avec succès !",
@@ -138,44 +140,82 @@ async def update_project(
         "project_id": project.id
     }
 
+
 @router.get("/projects/search")
 def search_projects(
     q: str = Query(None), 
     db: Session = Depends(get_db)
 ):
-    # On autorise la recherche dès 1 caractère si tu veux, 
-    # mais attention aux performances. Ici on garde 2.
     if not q or len(q) < 2:
         return []
 
     search_term = f"%{q}%"
 
-    # On commence la requête sur Project
-    # On fait un join simple sur User (Auteur)
-    query = db.query(Project).join(User, Project.owner_id == User.id, isouter=True)
+    # 1. On prépare la requête avec toutes les jointures nécessaires pour la recherche et le rendu
+    query = (
+        db.query(Project)
+        .join(User, Project.owner_id == User.id, isouter=True)
+        .join(Project.technologies, isouter=True)  # Jointure pour chercher dans les technos
+        .join(Program, Project.program_id == Program.id, isouter=True) # Jointure filière / programme
+        .join(AcademicYear, Project.academic_year_id == AcademicYear.id, isouter=True) # Jointure classe / année
+    )
 
-    # Construction du filtre
-    # Pour les technologies, on utilise .any() c'est beaucoup plus robuste
+    # 2. Construction des filtres dynamiques (titre, description, auteur, technos, filières, classes)
     conditions = [
         Project.title.ilike(search_term),
         Project.description.ilike(search_term),
+        # Recherche par auteur (Historique ou Utilisateur connecté)
+        Project.author_name.ilike(search_term), 
         User.first_name.ilike(search_term),
         User.last_name.ilike(search_term),
-        Project.technologies.any(Technology.name.ilike(search_term)) # <--- LA CLÉ
+        # Recherche par stack / hashtag
+        Technology.name.ilike(search_term),
+        # Recherche par filière / programme (Nom complet ou abréviation)
+        Program.name.ilike(search_term),
+        # Recherche par niveau / classe (Ex: "Licence 3", "Master", "2024-2025")
+        Project.level.ilike(search_term),
+        AcademicYear.label.ilike(search_term)
     ]
 
-    results = query.filter(
-        # Project.status == "approved", # À décommenter plus tard
-        or_(*conditions)
-    ).distinct().all()
+    # 3. Exécution avec distinct() pour éviter les doublons dus aux jointures multiples (plusieurs technos par projet)
+    results = query.filter(or_(*conditions)).distinct().all()
 
-    return [{
-        "id": p.id,
-        "title": p.title,
-        "author": f"{p.owner.first_name} {p.owner.last_name}" if p.owner else "DIT",
-        "program": p.program.name if p.program else "N/A",
-        "technologies": [t.name for t in p.technologies]
-    } for p in results]
+    # 4. Formatage strict et complet aligné avec ce que tes cartes frontend attendent !
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "description": p.description,
+            "github_url": p.github_repository_url,
+            "project_type": p.project_type,
+            "level": p.level,
+            "screenshots": p.screenshots,
+            "report_pdf_url": p.report_pdf_url,
+            "analysis_status": p.analysis_status,
+            "is_historical": p.is_historical,
+            # Gestion de l'auteur unifiée
+            "author_name": p.author_name if p.is_historical else f"{p.owner.first_name} {p.owner.last_name}" if p.owner else "Étudiant DIT",
+            "owner": {
+                "first_name": p.owner.first_name,
+                "last_name": p.owner.last_name
+            } if p.owner else None,
+            # Gestion du programme / filière
+            "program_id": p.program_id,
+            "program": {
+                "id": p.program.id,
+                "name": p.program.name
+            } if p.program else None,
+            # Gestion de l'année académique
+            "academic_year_id": p.academic_year_id,
+            "academic_year": {
+                "id": p.academic_year.id,
+                "label": p.academic_year.label
+            } if p.academic_year else None,
+            # 🟢 CRUCIAL : Recréer la chaîne 'technologies_list' pour que ExploreProjectCard ne crash pas
+            "technologies_list": ", ".join([t.name for t in p.technologies]) if p.technologies else None
+        } 
+        for p in results
+    ]
 
 @router.get("/projects/me")
 def get_my_projects(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

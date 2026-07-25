@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api/axios";
 import Navbar from "../navigations/Navbar";
 import ProjectCardV from "../project-components/ProjectCard";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Hash } from "lucide-react";
 import Footer from "../navigations/Footer";
 import ExploreProjectCard from "../project-components/ExploreProjectCard";
 
@@ -86,7 +86,7 @@ const Explore = () => {
     }
   };
 
-  // 2. Extraction dynamique pour les dropdowns
+  // 2. Extraction dynamique pour les dropdowns et hashtags populaires
   const allTechnos = [
     "Toutes les technos",
     ...new Set(
@@ -97,6 +97,9 @@ const Explore = () => {
       ),
     ),
   ];
+
+  // Extraction des 6 hashtags les plus récurrents pour affichage rapide
+  const popularHashtags = allTechnos.filter(t => t !== "Toutes les technos").slice(0, 6);
 
   const allFilieres = [
     "Niveau d'études",
@@ -110,14 +113,14 @@ const Explore = () => {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
 
-    // Filtrage par Technologie
+    // Filtrage par Technologie / Hashtag
     const matchesTech =
       selectedTech === "Toutes les technos" ||
       (project.technologies_list &&
         project.technologies_list
           .split(",")
-          .map((t) => t.trim())
-          .includes(selectedTech));
+          .map((t) => t.trim().toLowerCase())
+          .includes(selectedTech.toLowerCase()));
 
     // Filtrage par Filière / Niveau
     const matchesFiliere =
@@ -187,7 +190,7 @@ const Explore = () => {
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
             {/* Filtre Programmes */}
             <select
               value={selectedProgram}
@@ -202,7 +205,7 @@ const Explore = () => {
               ))}
             </select>
 
-            {/* Filtre Technos */}
+            {/* Filtre Technos (Stylisé Hashtag) */}
             <select
               value={selectedTech}
               onChange={(e) => setSelectedTech(e.target.value)}
@@ -210,7 +213,7 @@ const Explore = () => {
             >
               {allTechnos.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {t === "Toutes les technos" ? t : `#${t.toUpperCase()}`}
                 </option>
               ))}
             </select>
@@ -229,6 +232,29 @@ const Explore = () => {
             </select>
           </div>
         </div>
+
+        {/* 🟢 NOUVELLE ZONE VISUELLE : HASHTAGS RAPIDES */}
+        {popularHashtags.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-gray-400">
+            <span className="flex items-center gap-1"><Hash size={14} className="text-[#004751]" /> Tendances :</span>
+            {popularHashtags.map((tag) => {
+              const isActive = selectedTech.toLowerCase() === tag.toLowerCase();
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTech(isActive ? "Toutes les technos" : tag)}
+                  className={`px-3 py-1 rounded-full border transition-all uppercase text-[10px] tracking-wider font-black ${
+                    isActive
+                      ? "bg-[#004751] text-white border-[#004751] shadow-md shadow-teal-900/10"
+                      : "bg-white text-gray-500 border-gray-200 hover:border-[#E91E63] hover:text-[#E91E63]"
+                  }`}
+                >
+                  #{tag}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* GRILLE DE RÉSULTATS */}
         <div className="mt-12">
