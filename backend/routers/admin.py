@@ -12,6 +12,7 @@ from utils.cloudinary_utils import upload_to_cloudinary
 from datetime import timedelta, datetime
 from typing import Optional
 from services.mailer import send_custom_email, broadcast_email_task
+from seeds.seed_dataplace import sync_dataplace_datasets
 
 # Config GitHub
 g = Github(os.getenv("GITHUB_TOKEN"))
@@ -377,4 +378,18 @@ async def send_broadcast_email(
     return {
         "status": "success", 
         "message": f"La diffusion a été confiée à Nora en tâche de fond. {len(student_emails)} e-mails sont en cours d'envoi."
+    }
+
+@router.post("/dataplace/sync")
+def trigger_dataplace_sync(background_tasks: BackgroundTasks):
+    """
+    Déclenche manuellement la régénération et la synchronisation 
+    des datasets de la Dataplace depuis le panneau Admin.
+    """
+    # Exécution en tâche de fond pour ne pas bloquer le bouton sur le Front
+    background_tasks.add_task(sync_dataplace_datasets)
+    
+    return {
+        "status": "success",
+        "message": "La synchronisation des datasets de la Dataplace a été lancée en arrière-plan !"
     }
