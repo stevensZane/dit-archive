@@ -20,7 +20,7 @@ from config.system_prompts import get_nora_chat_system_prompt
 
 router = APIRouter(
     prefix="",
-    tags=["nora stuff"]
+    tags=["nora"]
 )
 
 # Configuration de Nomic

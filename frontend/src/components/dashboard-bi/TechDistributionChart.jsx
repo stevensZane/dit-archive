@@ -5,7 +5,7 @@ const TEAL_GRADIENT = ['#004751', '#0D5C67', '#1A727D', '#288894', '#389FAA', '#
 
 const TechDistributionChart = ({ data }) => (
   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-[360px]">
-    <h3 className="text-base font-bold text-slate-800 mb-4">🔥 Stack Technologique</h3>
+    <h3 className="text-base font-bold text-slate-800 mb-4">Stack Technologique</h3>
     <ResponsiveContainer width="100%" height="85%">
       <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20, top: 0, bottom: 0 }}>
         <XAxis type="number" hide />

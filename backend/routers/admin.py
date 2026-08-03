@@ -20,7 +20,7 @@ repo = g.get_repo(os.getenv("REPO_NAME"))
 
 router = APIRouter(
     prefix="",
-    tags=["admin stuff"]
+    tags=["admin"]
 )
 
 
@@ -256,16 +256,15 @@ def sync_old_points(db: Session = Depends(get_db)):
         
         # On lui attribue son rank_title de départ
         if user.total_points >= 1600:
-            user.rank_title = "Singularity Overlord"
+            user.rank_title = "Neural Master"      # Plus propre et badass que "Overlord"
         elif user.total_points >= 900:
-            user.rank_title = "Predictive Nexus"
+            user.rank_title = "Algorithm Visionary"# Évoque la maîtrise stratégique
         elif user.total_points >= 400:
-            user.rank_title = "Neural Architect"
+            user.rank_title = "Prompt Master"      # Un incontournable aujourd'hui !
         elif user.total_points >= 100:
-            user.rank_title = "Model Optimizer"
+            user.rank_title = "Data Craft"         # Très tendance
         else:
-            user.rank_title = "Prompt Apprentice"
-
+            user.rank_title = "Byte Explorer"      # Sympa pour démarrer
     db.commit()
     return {"message": "Toutes les anciennes données ont été synchronisées avec succès !"}
 

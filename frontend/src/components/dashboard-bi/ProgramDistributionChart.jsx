@@ -5,7 +5,7 @@ const PALETTE = ['#004751', '#3B82F6', '#6366F1', '#10B981', '#F59E0B'];
 
 const ProgramDistributionChart = ({ data }) => (
   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-[360px]">
-    <h3 className="text-base font-bold text-slate-800 mb-2">🎓 Projets par Filière</h3>
+    <h3 className="text-base font-bold text-slate-800 mb-2">Projets par Filière</h3>
     <ResponsiveContainer width="100%" height="85%">
       <PieChart>
         <Pie

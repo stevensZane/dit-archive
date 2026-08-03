@@ -3,7 +3,7 @@ import { Eye, Download, Star } from 'lucide-react';
 
 const TopProjectsTable = ({ projects }) => (
   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-    <h3 className="text-base font-bold text-slate-800 mb-4">🏆 Projets les Plus Impactants</h3>
+    <h3 className="text-base font-bold text-slate-800 mb-4">Projets les Plus Impactants</h3>
     <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse">
         <thead>

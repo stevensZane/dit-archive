@@ -22,7 +22,7 @@ const DataPlace = () => {
   const [selectedCategory, setSelectedCategory] = useState("Tous");
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
 
-  // MÊME LOGIQUE DE RÉCUPÉRATION USER QUE LA NAVBAR (Inspection sécurisée du localStorage)
+  // Inspection sécurisée du localStorage pour identifier l'utilisateur
   const storedUser = localStorage.getItem("user");
   let user = null;
 
@@ -34,6 +34,9 @@ const DataPlace = () => {
 
   const currentUserId = user?.id ?? null;
   const userRole = user?.role ?? "guest";
+
+  // Vérification si l'utilisateur est authentifié et non-guest
+  const canSubmitDataset = user !== null && userRole !== "guest";
 
   // Récupération dynamique depuis l'API centralisée
   const fetchDatasets = async () => {
@@ -95,13 +98,16 @@ const DataPlace = () => {
             </p>
           </div>
 
-          <button
-            onClick={() => setIsSubmitModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-3 bg-[#004751] text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-all shadow-md shadow-teal-900/10 shrink-0"
-          >
-            <Plus size={16} />
-            <span>Proposer un Dataset</span>
-          </button>
+          {/* Affichage conditionnel du bouton : Masqué pour les Guests */}
+          {canSubmitDataset && (
+            <button
+              onClick={() => setIsSubmitModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-3 bg-[#004751] text-white rounded-2xl text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-all shadow-md shadow-teal-900/10 shrink-0"
+            >
+              <Plus size={16} />
+              <span>Proposer un Dataset</span>
+            </button>
+          )}
         </div>
       </header>
 
