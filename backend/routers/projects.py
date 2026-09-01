@@ -30,62 +30,73 @@ async def create_new_project(
     title: str = Form(...),
     description: str = Form(...),
     github_url: str = Form(None),
-    tags: Optional[str] = Form(None), # Nouveau champ hashtags (reçu sous forme de chaîne "tag1,tag2")
-    project_type: str = Form(...), 
-    academic_year_id: Optional[int] = Form(None), 
-    report_pdf: UploadFile = File(...), 
-    screenshot_files: List[UploadFile] = File(None), 
+    tags: Optional[str] = Form(None),
+    project_type: str = Form(...),
+    academic_year_id: Optional[int] = Form(None),
+    report_pdf: UploadFile = File(...),
+    screenshot_files: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
-    # 1. Upload du PDF sur Cloudinary
-    pdf_url = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
-    
-    # 2. Upload des Screenshots
-    screenshot_urls = []
-    if screenshot_files:
-        for img in screenshot_files:
-            url = upload_to_cloudinary(img.file, folder="projects/screenshots")
-            if url:
-                screenshot_urls.append(url)
-    
-    screenshots_str = ",".join(screenshot_urls) if screenshot_urls else None
+  # 1. Upload du PDF sur Cloudinary et extraction stricte de l'URL (chaine de caractères)
+  pdf_res = upload_to_cloudinary(report_pdf.file, folder="projects/reports")
+  pdf_url = (
+      pdf_res.get("url")
+      if isinstance(pdf_res, dict)
+      else str(pdf_res)
+      if pdf_res
+      else None
+  )
 
-    # Logique d'attribution dynamique de l'année académique
-    chosen_academic_year = academic_year_id if academic_year_id is not None else current_user.academic_year_id
+  # 2. Upload des Screenshots et extraction des URLs
+  screenshot_urls = []
+  if screenshot_files:
+    for img in screenshot_files:
+      img_res = upload_to_cloudinary(img.file, folder="projects/screenshots")
+      if img_res:
+        img_url = img_res.get("url") if isinstance(img_res, dict) else str(img_res)
+        if img_url:
+          screenshot_urls.append(img_url)
 
-    # 3. Création de l'entrée en Base de Données
-    new_project = Project(
-        title=title,
-        description=description,
-        github_repository_url=github_url,
-        tags=tags, # Sauvegarde des hashtags en BDD
-        project_type=project_type,
-        report_pdf_url=pdf_url,
-        screenshots=screenshots_str,
-        academic_year_id=chosen_academic_year,
-        program_id=current_user.program_id,
-        level=current_user.level,
-        owner_id=current_user.id,
-        analysis_status="pending",
-        views_count=0,
-        downloads_count=0
-    )
+  screenshots_str = ",".join(screenshot_urls) if screenshot_urls else None
 
-    db.add(new_project)
-    db.commit()
-    db.refresh(new_project)
-    
-    # 4. Traitement asynchrone (Pipeline d'archivage / Nora)
-    # On lance TOUJOURS la tâche de fond pour que Nora lise le document.
-    # Ton script 'process_and_archive_project' devra vérifier si le projet a un github_url ou s'il doit analyser uniquement le PDF.
-    background_tasks.add_task(process_and_archive_project, new_project.id)
+  # Attribution de l'année académique
+  chosen_academic_year = (
+      academic_year_id
+      if academic_year_id is not None
+      else current_user.academic_year_id
+  )
 
-    return {
-        "message": "Projet créé avec succès !",
-        "project_id": new_project.id,
-        "pdf_url": pdf_url
-    }
+  # 3. Création de l'entrée en Base de Données (avec des types string valides)
+  new_project = Project(
+      title=title,
+      description=description,
+      github_repository_url=github_url,
+      tags=tags,
+      project_type=project_type,
+      report_pdf_url=pdf_url,  # URL sous forme de String
+      screenshots=screenshots_str,
+      academic_year_id=chosen_academic_year,
+      program_id=current_user.program_id,
+      level=current_user.level,
+      owner_id=current_user.id,
+      analysis_status="pending",
+      views_count=0,
+      downloads_count=0,
+  )
+
+  db.add(new_project)
+  db.commit()
+  db.refresh(new_project)
+
+  # 4. Traitement asynchrone (Nora)
+  background_tasks.add_task(process_and_archive_project, new_project.id)
+
+  return {
+      "message": "Le projet a été archivé avec succès !",
+      "project_id": new_project.id,
+      "pdf_url": pdf_url,
+  }
 
 @router.put("/projects/{project_id}")
 async def update_project(
