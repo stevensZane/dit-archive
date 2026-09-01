@@ -1,74 +1,61 @@
-📚 Nora : L'Archive Inteligente du DIT
-Nora est une plateforme moderne d'archivage et de consultation des projets académiques de la Digital Industry Academy (DIT). Elle automatise la récupération des rapports, analyse le code source via l'IA et offre une interface intuitive pour explorer l'historique des travaux des étudiants.
+# DIT Archive — Bibliothèque Intelligente de Projets & Data Place
 
-🚀 Fonctionnalités Clés
-Archivage Automatisé : Un worker récupère les métadonnées depuis GitHub et archive les rapports PDF sur un dépôt centralisé.
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)
+![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=for-the-badge&logo=react)
+![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL_%2B_pgvector-4169E1?style=for-the-badge&logo=postgresql)
+![Groq](https://img.shields.io/badge/AI-Groq_LLaMA_3.1-f34f29?style=for-the-badge)
+![TailwindCSS](https://img.shields.io/badge/Styling-Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css)
 
-Intelligence Artificielle (Nora) :
+**DIT Archive** est la plateforme officielle de centralisation, d'indexation et de valorisation du patrimoine académique du **Dakar Institute of Technology (DIT)**. Elle combine un moteur de recherche vectoriel (RAG), une IA conversationnelle dédiée (**Agent Nora**) et un espace **Data Place** anonymisé pour rendre la mémoire scientifique de l'établissement vivante, interactive et exploitable.
 
-Résumés automatiques des projets avec Groq (Llama 3.1).
+---
 
-Chatbot interactif pour poser des questions sur les technos ou les fonctionnalités.
+## Fonctionnalités Principales
 
-Proxy Sécurisé : Consultation des rapports PDF hébergés sur des dépôts GitHub privés sans exposer les tokens.
+* **Archivage Centralisé & Automatisé :** Guichet unique pour le dépôt des mémoires PDF, dépôts GitHub et métadonnées associées avec gestion des statuts de validation admin.
+* **Agent Conversationnel RAG (Nora) :** Interrogation sémantique en langage naturel des rapports académiques via LLaMA 3.1 (Groq API) et `pgvector` sans risque d'hallucination.
+* **Data Place Académique & Pipeline ETL :** Export et réutilisation de datasets d'apprentissage nettoyés, structurés et anonymisés (conformité RGPD via hachage SHA-256).
+* **Sécurité RBAC & Auth JWT :** Contrôle d'accès strict par rôles (`Guest`, `Student`, `Admin`, `SuperAdmin`) et protection du `localStorage` à la déconnexion.
+* ⚡ **Architecture 4-Tiers Découplée :** Application Single Page (SPA) Mobile-First connectée à une API REST asynchrone haute performance.
 
-Stack Technique Dynamique : Détection automatique des langages majoritaires des dépôts.
+---
 
-Gestion Multimédia : Support des captures d'écran et des liens de démonstration.
+## Stack Technique
 
-🛠 Stack Technique
-Backend (Python / FastAPI)
-Framework : FastAPI (Asynchrone, performant).
+| Layer | Technologies & Outils |
+| :--- | :--- |
+| **Frontend** | React 18, Tailwind CSS, Lucide Icons, React Router v6, Axios |
+| **Backend** | Python 3.12, FastAPI (Asynchrone), SQLAlchemy 2.0, Pydantic v2 |
+| **IA & Vector Search** | RAG Pipeline, Groq API (LLaMA 3.1 8B), `pgvector`, Sentence-Transformers |
+| **Base de Données** | PostgreSQL (Neon.tech Serverless) |
+| **Stockage Médias** | Cloudinary CDN (Rapports PDF, Captures d'écran) |
+| **Déploiement** | Vercel (Front-end), Railway (Back-end) |
 
-Base de données : PostgreSQL avec SQLAlchemy 2.0.
+---
 
-IA : Groq API (Llama 3.1 / 3.3).
+## Architecture du Projet
 
-Worker : Script de traitement asynchrone pour GitHub.
-
-Frontend (React / Tailwind CSS)
-UI : Tailwind CSS & Lucide Icons.
-
-Routing : React Router DOM.
-
-Client API : Axios.
-
-📂 Structure du Projet (Backend)
-Le projet suit une architecture modulaire pour une maintenance facilitée :
-
-Plaintext
-backend/
-├── main.py              # Point d'entrée et agrégation des routers
-├── database.py          # Configuration SQLAlchemy
-├── models.py            # Définition des tables (Project, User, etc.)
-├── services/            # Services externes (GitHub, Groq IA)
-└── routers/             # Points de terminaison (Endpoints)
-    ├── projects.py      # Gestion des dossiers et rapports
-    ├── nora.py          # Intelligence artificielle & Chat
-    └── auth.py          # Authentification et utilisateurs
-
-
-⚙️ Installation et Lancement
-1. Cloner le dépôt
-Bash
-git clone https://github.com/votre-repo/nora-archive.git
-cd nora-archive
-2. Configuration (Variables d'environnement)
-Créez un fichier .env dans le dossier backend/ :
-
-Extrait de code
-DATABASE_URL=postgresql://user:password@localhost/dbname
-GITHUB_TOKEN=votre_token_github
-GROQ_API_KEY=votre_cle_groq
-3. Lancer le Backend
-Bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
-4. Lancer le Frontend
-Bash
-cd frontend
-npm install
-npm run dev
-🤖 À propos de Nora
-Nora n'est pas qu'une base de données ; elle est conçue pour aider les futurs étudiants à comprendre les travaux de leurs prédécesseurs. En analysant les fichiers README.md et le code source, elle fournit un contexte précieux que les fichiers classiques ne peuvent pas offrir.
+```text
+dit-archive/
+├── backend/
+│   ├── main.py                 # Point d'entrée FastAPI & configuration CORS
+│   ├── database.py             # Session SQLAlchemy & connexion PostgreSQL
+│   ├── models.py               # Modèles ORM (Project, User, AcademicYear, etc.)
+│   ├── schemas.py              # Validation des données Pydantic
+│   ├── services/               # Services métiers (Cloudinary, RAG Nora, Pipeline ETL)
+│   │   ├── cloudinary_service.py
+│   │   ├── nora_rag.py
+│   │   └── etl_pipeline.py
+│   └── routers/                # Endpoints de l'API REST
+│       ├── auth.py             # Authentification JWT & Inscription
+│       ├── projects.py         # Dépôt, validation & consultation des projets
+│       ├── nora.py             # Moteur RAG & Chatbot Nora
+│       └── dataplace.py        # Gestion des jeux de données réutilisables
+└── frontend/
+    ├── src/
+    │   ├── api/                # Configuration Axios
+    │   ├── components/         # Composants UI réutilisables
+    │   ├── student-space/      # Interface Espace Étudiant & Modales
+    │   ├── admin-space/        # Dashboard Administrateur
+    │   └── pages/              # Vue Galerie, Chat Nora, Data Place
+    └── package.json

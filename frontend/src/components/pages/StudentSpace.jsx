@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, Sparkles } from "lucide-react";
+import { Plus, Loader2, Sparkles, CheckCircle, X } from "lucide-react";
 import api from "../api/axios";
 import Navbar from "../navigations/Navbar";
 import ProjectModal from "../student-space/ProjectModal";
@@ -12,10 +12,12 @@ const StudentPortal = () => {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState(null);
+  
+  // Nouveau state pour le message de succès d'archivage
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // On ne fetch plus les filières et les années, le backend s'en occupe
   const fetchProjects = async (silent = false) => {
     if (!silent) setFetchLoading(true);
     try {
@@ -46,15 +48,22 @@ const StudentPortal = () => {
     setProjectToEdit(null);
   };
 
+  // Callback de succès d'archivage
+  const handleUploadSuccess = () => {
+    fetchProjects(true);
+    setSuccessMessage("Projet archivé avec succès ! Nora est en train de l'analyser.");
+    // Masque le message au bout de 5 secondes
+    setTimeout(() => setSuccessMessage(null), 5000);
+  };
+
   useEffect(() => {
-    // Si certains projets sont encore en "pending", on revérifie toutes les 10 secondes
     const hasPendingProjects = projects.some(
       (p) => p.analysis_status === "pending",
     );
 
     if (hasPendingProjects) {
       const interval = setInterval(() => {
-        fetchProjects(true); // "true" pour le mode silencieux (pas de gros loader au milieu de l'écran)
+        fetchProjects(true);
       }, 10000);
 
       return () => clearInterval(interval);
@@ -66,6 +75,23 @@ const StudentPortal = () => {
       <Navbar />
 
       <main className="max-w-4xl mx-auto pt-32 pb-20 px-6">
+        
+        {/* Bandeau de confirmation de succès */}
+        {successMessage && (
+          <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center justify-between shadow-sm animate-fade-in">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="text-emerald-600 shrink-0" size={20} />
+              <span className="font-semibold text-sm">{successMessage}</span>
+            </div>
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="text-emerald-500 hover:text-emerald-700 transition-colors p-1"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
         <header className="flex justify-between items-end mb-12">
           <div>
             <h1 className="text-4xl font-black tracking-tight text-slate-900">
@@ -124,12 +150,11 @@ const StudentPortal = () => {
         </section>
       </main>
 
-      {/* UNE SEULE MODALE : Elle gère Création et Edition via initialData */}
       <ProjectModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         initialData={projectToEdit}
-        onUploadSuccess={() => fetchProjects(true)}
+        onUploadSuccess={handleUploadSuccess}
       />
     </div>
   );
